@@ -307,7 +307,7 @@ with tab1:
         st.divider()
 
         with st.expander(T("del_record_expand")):
-            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']}": r['id'] for i, r in raw_df.iterrows()}
+            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']:.2f}": r['id'] for i, r in raw_df.iterrows()}
             if del_opts:
                 sel_lbl = st.selectbox(T("select_record"), options=del_opts.keys())
                 if st.button(T("btn_del_record")):
