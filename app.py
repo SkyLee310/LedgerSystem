@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import backend
 from datetime import date, timedelta
+CURRENCY = "RM"
 
 
 TRANS = {
@@ -276,9 +277,9 @@ with tab1:
 
         inc, exp, bal = backend.get_summary(df)
         m1, m2, m3 = st.columns(3)
-        m1.metric(T("total_income"), f"RM{inc:,.2f}")
-        m2.metric(T("total_expense"), f"RM{exp:,.2f}")
-        m3.metric(T("balance"), f"RM{bal:,.2f}")
+        m1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}")
+        m2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}")
+        m3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}")
         st.divider()
 
         c1, c2 = st.columns([2, 1])
@@ -306,7 +307,7 @@ with tab1:
         st.divider()
 
         with st.expander(T("del_record_expand")):
-            del_opts = {f"{r['date']}|{r['category']}|¥{r['amount']}": r['id'] for i, r in raw_df.iterrows()}
+            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']}": r['id'] for i, r in raw_df.iterrows()}
             if del_opts:
                 sel_lbl = st.selectbox(T("select_record"), options=del_opts.keys())
                 if st.button(T("btn_del_record")):
