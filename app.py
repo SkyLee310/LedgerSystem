@@ -304,10 +304,12 @@ with tab1:
 
         if sel_cats:
             df = df[df['category'].isin(sel_cats)]
+
         if sel_type != T("all"):
             df = df[df['type'] == sel_type]
 
         inc, exp, bal = backend.get_summary(df)
+
         m1, m2, m3 = st.columns(3)
         m1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}")
         m2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}")
