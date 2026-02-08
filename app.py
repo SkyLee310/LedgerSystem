@@ -3,8 +3,9 @@ import pandas as pd
 import plotly.express as px
 import backend
 from datetime import date, timedelta
-CURRENCY = "RM"
 
+
+CURRENCY = "RM"
 
 TRANS = {
     # 侧边栏 & 标题
@@ -100,39 +101,6 @@ CAT_TRANS = {
     "其他": "Others"
 }
 
-def get_cat_display(cat_name):
-    lang = st.session_state.get('language_code', 'CN')
-    if lang == 'EN':
-        return CAT_TRANS.get(cat_name, cat_name)
-    else:
-        return cat_name
-
-def save_callback():
-    amt = st.session_state.get('input_amount', 0.0)
-    cat = st.session_state.get('input_category', "")
-    typ = st.session_state.get('input_type', "")
-    note = st.session_state.get('input_note', "")
-    dt = st.session_state.get('input_date', date.today())
-
-    active_id = st.session_state.get('active_ledger_id')
-
-    if active_id and amt > 0 and cat:
-        db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
-        backend.add_record(active_id, dt, db_type, cat, amt, note)
-        st.success("Saved!")
-
-def add_cat_callback():
-    new_c = st.session_state['new_cat_input']
-    if new_c and backend.add_category(current_ledger_id, new_c):
-        st.toast(f"{T('msg_cat_added')}: {new_c}")
-        st.session_state['new_cat_input'] = ""
-
-
-def del_cat_callback():
-    del_c = st.session_state['del_cat_select']
-    if del_c:
-        backend.delete_category(current_ledger_id, del_c)
-        st.toast(f"{T('msg_cat_deleted')}: {del_c}")
 
 
 def T(key):
@@ -141,6 +109,53 @@ def T(key):
         return TRANS[key][lang]
     return key
 
+
+def get_cat_display(cat_name):
+    lang = st.session_state.get('language_code', 'CN')
+    if lang == 'EN':
+        return CAT_TRANS.get(cat_name, cat_name)
+    else:
+        return cat_name
+
+
+def save_callback():
+    amt = st.session_state.get('input_amount', 0.0)
+    cat = st.session_state.get('input_category', "")
+    typ = st.session_state.get('input_type', "")
+    note = st.session_state.get('input_note', "")
+
+    dt = st.session_state.get('input_date', date.today())
+
+    active_id = st.session_state.get('active_ledger_id')
+
+    if active_id and amt > 0 and cat:
+
+        db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+
+        backend.add_record(active_id, dt, db_type, cat, amt, note)
+        st.success("Saved!")
+    elif amt <= 0:
+        st.error("Amount must be > 0")
+    else:
+        st.error("Please check inputs")
+
+
+def add_cat_callback():
+    new_c = st.session_state.get('new_cat_input')
+    active_id = st.session_state.get('active_ledger_id')
+    if active_id and new_c and backend.add_category(active_id, new_c):
+        st.toast(f"{T('msg_cat_added')}: {new_c}")
+        st.session_state['new_cat_input'] = ""
+
+
+def del_cat_callback():
+    del_c = st.session_state.get('del_cat_select')
+    active_id = st.session_state.get('active_ledger_id')
+    if active_id and del_c:
+        backend.delete_category(active_id, del_c)
+        st.toast(f"{T('msg_cat_deleted')}: {del_c}")
+
+
 st.set_page_config(page_title="My Ledger System", page_icon="📓", layout="wide")
 
 hide_st_style = """
@@ -148,7 +163,6 @@ hide_st_style = """
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
-            /* 调整手机上的内边距，让内容更紧凑 */
             .block-container {
                 padding-top: 1rem;
                 padding-bottom: 1rem;
@@ -181,18 +195,31 @@ with st.sidebar:
 
     with st.expander(T("ledger_settings")):
         l_tab1, l_tab2 = st.tabs([T("tab_add"), T("tab_del")])
+
         with l_tab1:
             new_ledger_name = st.text_input(T("input_new_ledger"), key="new_ledger_input")
             if st.button(T("btn_create_ledger")):
                 if new_ledger_name and new_ledger_name not in ledger_names:
-                    backend.add_ledger(new_ledger_name)
-                    st.rerun()
+                    if backend.add_ledger(new_ledger_name):
+                        st.success("OK")
+                        st.rerun()
+                elif new_ledger_name in ledger_names:
+                    st.error("Exists / 已存在")
+
         with l_tab2:
             st.warning(T("warn_del_ledger"))
             ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
-            if st.button(T("btn_del_ledger")):
-                backend.delete_ledger(ledger_map[ledger_to_del])
-                st.rerun()
+            confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
+            confirm_del = st.checkbox(confirm_text, key="del_confirm")
+
+            if st.button(T("btn_del_ledger"), disabled=not confirm_del):
+                del_id = ledger_map[ledger_to_del]
+                success, msg = backend.delete_ledger(del_id)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
 
     st.divider()
 
@@ -206,9 +233,9 @@ with st.sidebar:
             st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
             st.button(T("btn_del_cat"), on_click=del_cat_callback)
 
-
 st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
 
+# 📱 手机适配版记账框 (放在主界面顶部)
 with st.expander(T("header_entry"), expanded=True):
     c1, c2 = st.columns(2)
     with c1:
@@ -225,69 +252,7 @@ with st.expander(T("header_entry"), expanded=True):
         st.number_input("金额 / Amount", min_value=0.0, step=0.01, format="%.2f", key='input_amount')
 
     st.text_input("备注 / Note", key='input_note')
-
     st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
-
-
-    with l_tab1:
-        new_ledger_name = st.text_input(T("input_new_ledger"), key="new_ledger_input")
-        if st.button(T("btn_create_ledger")):
-            if new_ledger_name and new_ledger_name not in ledger_names:
-                if backend.add_ledger(new_ledger_name):
-                    st.success("OK")
-                    st.rerun()
-            elif new_ledger_name in ledger_names:
-                st.error("Exists / 已存在")
-
-    with l_tab2:
-        st.warning(T("warn_del_ledger"))
-        ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
-
-        confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
-        confirm_del = st.checkbox(confirm_text, key="del_confirm")
-
-        if st.button(T("btn_del_ledger"), disabled=not confirm_del):
-            del_id = ledger_map[ledger_to_del]
-            success, msg = backend.delete_ledger(del_id)
-            if success:
-                st.success(msg)
-                st.rerun()
-            else:
-                st.error(msg)
-
-    st.divider()
-
-    st.header(f"{T('header_entry')}")
-
-    current_categories = backend.get_categories(current_ledger_id)
-
-    st.date_input(T("date"), key='input_date')
-
-    type_options = ["Expense", "Income"] if st.session_state['language_code'] == 'EN' else ["支出", "收入"]
-    st.selectbox(T("type"), type_options, key='input_type')
-
-    if current_categories:
-        st.selectbox(T("category"),current_categories,format_func=get_cat_display,key='input_category')
-    else:
-        st.warning(T("msg_no_cat"))
-
-    st.number_input(T("amount"), min_value=0.0, step=1.0, key='input_amount')
-    st.text_input(T("note"), key='input_note')
-
-    st.button(T("btn_save"), on_click=save_callback, type="primary")
-
-    st.divider()
-
-    with st.expander(T("cat_manage")):
-        c_tab1, c_tab2 = st.tabs([T("tab_add"), T("tab_del")])
-        with c_tab1:
-            st.text_input(T("input_new_cat"), key='new_cat_input')
-            st.button(T("btn_add_cat"), on_click=add_cat_callback)
-        with c_tab2:
-            st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
-            st.button(T("btn_del_cat"), on_click=del_cat_callback)
-
-st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
 
 tab1, tab2, tab3 = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_export")])
 
@@ -295,7 +260,6 @@ with tab1:
     raw_df = backend.get_all_records(current_ledger_id)
 
     if not raw_df.empty:
-        # === 筛选区域 ===
         with st.expander(T("filter_expand"), expanded=False):
             col1, col2 = st.columns([2, 1])
             with col1:
@@ -309,7 +273,7 @@ with tab1:
                 )
             with col2:
                 type_filter_opts = [T("all")] + (
-                    ["Expense", "Income"] if st.session_state['language_code'] == 'EN' else ["支出", "收入"])
+                    ["Expense", "Income"] if st.session_state.get('language_code') == 'EN' else ["支出", "收入"])
                 sel_type = st.selectbox(T("filter_type"), type_filter_opts)
 
         df = raw_df.copy()
@@ -324,16 +288,13 @@ with tab1:
         if st.session_state.get('language_code') == 'EN':
             df.loc[exp_mask, 'type'] = "Expense"
             df.loc[inc_mask, 'type'] = "Income"
+            df['category'] = df['category'].map(CAT_TRANS).fillna(df['category'])
         else:
             df.loc[exp_mask, 'type'] = "支出"
             df.loc[inc_mask, 'type'] = "收入"
 
-        if st.session_state.get('language_code') == 'EN':
-            df['category'] = df['category'].map(CAT_TRANS).fillna(df['category'])
-
         if sel_cats:
             df = df[df['category'].isin(sel_cats)]
-
         if sel_type != T("all"):
             df = df[df['type'] == sel_type]
 
@@ -351,8 +312,6 @@ with tab1:
 
         with c2:
             st.subheader(T("header_chart"))
-
-
             exp_condition = df['type'].astype(str).str.contains('支出|Expense', case=False, na=False)
             exp_df = df[exp_condition]
 
@@ -360,25 +319,18 @@ with tab1:
                 chart_data = exp_df.groupby('category')['amount'].sum().reset_index()
                 fig = px.pie(chart_data, values='amount', names='category', hole=0.4)
                 fig.update_layout(
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=-0.2,
-                        xanchor="center",
-                        x=0.5
-                    ),
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
                     margin=dict(l=0, r=0, t=30, b=0)
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info(T("no_expense"))
-                if st.checkbox("显示调试数据 (Debug)"):
-                    st.write("当前筛选后的数据里，'类型'列的值有：", df['type'].unique())
 
         st.divider()
 
         with st.expander(T("del_record_expand")):
-            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']:.2f}": r['id'] for i, r in raw_df.iterrows()}
+            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']:.2f}": r['id'] for i, r in
+                        raw_df.iterrows()}
             if del_opts:
                 sel_lbl = st.selectbox(T("select_record"), options=del_opts.keys())
                 if st.button(T("btn_del_record")):
@@ -390,12 +342,10 @@ with tab1:
 
 with tab2:
     st.subheader(T("chart_trend"))
-
     stat_df = backend.get_all_records(current_ledger_id)
 
     if not stat_df.empty:
         stat_df['month'] = pd.to_datetime(stat_df['date']).dt.to_period('M').astype(str)
-
         monthly_data = stat_df.groupby(['month', 'type'])['amount'].sum().reset_index()
 
         color_map = {
@@ -404,43 +354,29 @@ with tab2:
         }
 
         fig_trend = px.bar(
-            monthly_data,
-            x='month',
-            y='amount',
-            color='type',
-            barmode='group',
-            color_discrete_map=color_map,
-            text_auto='.2s',
+            monthly_data, x='month', y='amount', color='type',
+            barmode='group', color_discrete_map=color_map, text_auto='.2s',
             title="Monthly Income vs Expense"
         )
         st.plotly_chart(fig_trend, use_container_width=True)
 
         st.divider()
-
         st.subheader(T("chart_rank"))
 
         exp_df = stat_df[stat_df['type'].astype(str).str.contains('支出|Expense', case=False)]
-
         if not exp_df.empty:
             cat_rank = exp_df.groupby('category')['amount'].sum().reset_index().sort_values('amount', ascending=True)
-
             if st.session_state.get('language_code') == 'EN':
                 cat_rank['category'] = cat_rank['category'].map(CAT_TRANS).fillna(cat_rank['category'])
 
             fig_rank = px.bar(
-                cat_rank,
-                x='amount',
-                y='category',
-                orientation='h',
-                text_auto='.2s',
-                title="Top Expense Categories",
-                color='amount',
-                color_continuous_scale='Reds'
+                cat_rank, x='amount', y='category', orientation='h',
+                text_auto='.2s', title="Top Expense Categories",
+                color='amount', color_continuous_scale='Reds'
             )
             st.plotly_chart(fig_rank, use_container_width=True)
         else:
             st.info(T("no_expense"))
-
     else:
         st.info(T("empty_ledger"))
 
