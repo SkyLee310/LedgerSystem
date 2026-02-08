@@ -170,21 +170,19 @@ with st.sidebar:
     current_categories = backend.get_categories(current_ledger_id)
 
     def save_callback():
-        if st.session_state['input_amount'] > 0:
-            backend.save_record(
-                current_ledger_id,
-                st.session_state['input_date'],
-                st.session_state['input_type'],
-                st.session_state['input_category'],
-                st.session_state['input_amount'],
-                st.session_state['input_note']
-            )
-            st.toast(T("msg_saved"))
-            st.session_state['input_amount'] = 0.0
-            st.session_state['input_note'] = ""
-        else:
-            st.toast(T("msg_amount_error"))
+        amt = st.session_state.get('input_amount', 0.0)
+        cat = st.session_state.get('input_category', "")
+        typ = st.session_state.get('input_type', "")
+        note = st.session_state.get('input_note', "")
+        dt = date.today()
 
+        if amt > 0 and cat:
+            db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+
+            backend.add_record(current_ledger_id, dt, db_type, cat, amt, note)
+            st.success("Saved!")
+        else:
+            st.error("Please fill all fields")
 
     def add_cat_callback():
         new_c = st.session_state['new_cat_input']
@@ -252,6 +250,20 @@ with tab1:
                 sel_type = st.selectbox(T("filter_type"), type_filter_opts)
 
         df = raw_df.copy()
+
+        exp_mask = df['type'].isin(['支出', 'Expense'])
+        inc_mask = df['type'].isin(['收入', 'Income'])
+
+        total_exp = df[exp_mask]['amount'].sum()
+        total_inc = df[inc_mask]['amount'].sum()
+        balance = total_inc - total_exp
+
+        if st.session_state.get('language_code') == 'EN':
+            df.loc[exp_mask, 'type'] = "Expense"
+            df.loc[inc_mask, 'type'] = "Income"
+        else:
+            df.loc[exp_mask, 'type'] = "支出"
+            df.loc[inc_mask, 'type'] = "收入"
 
         if st.session_state.get('language_code') == 'EN':
             df['category'] = df['category'].map(CAT_TRANS).fillna(df['category'])
