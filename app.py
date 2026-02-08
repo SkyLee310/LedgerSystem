@@ -116,6 +116,22 @@ def T(key):
 
 st.set_page_config(page_title="My Ledger System", page_icon="📓", layout="wide")
 
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            /* 调整手机上的内边距，让内容更紧凑 */
+            .block-container {
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 backend.init_db()
 
 all_ledgers = backend.get_ledgers()
@@ -127,6 +143,17 @@ with st.sidebar:
     st.divider()
 
     st.title(T("sidebar_title"))
+    with st.expander("➕ 记一笔 (New Entry)", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            date = st.date_input(...)
+            typ = st.selectbox(...)
+        with c2:
+            cat = st.selectbox(...)
+            amt = st.number_input(...)
+
+        note = st.text_input(...)
+        st.button("保存 (Save)", use_container_width=True)
 
     selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
 
@@ -297,7 +324,16 @@ with tab1:
             if not exp_df.empty:
                 chart_data = exp_df.groupby('category')['amount'].sum().reset_index()
                 fig = px.pie(chart_data, values='amount', names='category', hole=0.4)
-                fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0))
+                fig.update_layout(
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=-0.2,
+                        xanchor="center",
+                        x=0.5
+                    ),
+                    margin=dict(l=0, r=0, t=30, b=0)
+                )
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info(T("no_expense"))
