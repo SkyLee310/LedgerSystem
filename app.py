@@ -118,7 +118,6 @@ def get_cat_display(cat_name):
     else:
         return cat_name
 
-
 def save_callback():
     amt = st.session_state.get('input_amount', 0.0)
     cat = st.session_state.get('input_category', "")
@@ -249,7 +248,13 @@ with st.expander(T("header_entry"), expanded=True):
 
     with c2:
         current_categories = backend.get_categories(current_ledger_id)
-        st.selectbox(T("category"), current_categories, format_func=get_cat_display, key='input_category')
+        st.selectbox(
+            T("category"),
+            current_categories,
+            format_func=get_cat_display,
+            key='input_category'
+        )
+
         st.number_input(T("amount"), min_value=0.0, step=0.01, format="%.2f", key='input_amount')
 
 
