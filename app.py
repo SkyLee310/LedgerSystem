@@ -114,13 +114,12 @@ def save_callback():
     note = st.session_state.get('input_note', "")
     dt = st.session_state.get('input_date', date.today())
 
-    if amt > 0 and cat:
-        db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+    active_id = st.session_state.get('active_ledger_id')
 
-        backend.add_record(current_ledger_id, dt, db_type, cat, amt, note)
+    if active_id and amt > 0 and cat:
+        db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+        backend.add_record(active_id, dt, db_type, cat, amt, note)
         st.success("Saved!")
-    else:
-        st.error("Please fill all fields")
 
 def add_cat_callback():
     new_c = st.session_state['new_cat_input']
