@@ -88,6 +88,7 @@ TRANS = {
     "stat_bar_mode": {"CN": "显示模式", "EN": "Display Mode"},
     "mode_group": {"CN": "分组对比", "EN": "Grouped"},
     "mode_stack": {"CN": "堆叠显示", "EN": "Stacked"}
+
 }
 
 CAT_TRANS = {
@@ -249,9 +250,10 @@ with st.expander(T("header_entry"), expanded=True):
     with c2:
         current_categories = backend.get_categories(current_ledger_id)
         st.selectbox(T("category"), current_categories, format_func=get_cat_display, key='input_category')
-        st.number_input("金额 / Amount", min_value=0.0, step=0.01, format="%.2f", key='input_amount')
+        st.number_input(T("amount"), min_value=0.0, step=0.01, format="%.2f", key='input_amount')
 
-    st.text_input("备注 / Note", key='input_note')
+
+    st.text_input(T("note"), key='input_note')
     st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
 
 tab1, tab2, tab3 = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_export")])
