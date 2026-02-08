@@ -119,8 +119,9 @@ def get_cat_display(cat_name):
         return cat_name
 
 def save_callback():
+    lang = st.session_state.get('language_code', 'CN')
     amt = st.session_state.get('input_amount', 0.0)
-    cat = st.session_state.get('input_category', "")
+    cat = st.session_state.get(f'input_category_{lang}', "")
     typ = st.session_state.get('input_type', "")
     note = st.session_state.get('input_note', "")
 
@@ -248,13 +249,14 @@ with st.expander(T("header_entry"), expanded=True):
 
     with c2:
         current_categories = backend.get_categories(current_ledger_id)
+
+        current_lang = st.session_state.get('language_code', 'CN')
         st.selectbox(
             T("category"),
             current_categories,
             format_func=get_cat_display,
-            key='input_category'
+            key=f'input_category_{current_lang}'
         )
-
         st.number_input(T("amount"), min_value=0.0, step=0.01, format="%.2f", key='input_amount')
 
 
