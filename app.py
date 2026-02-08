@@ -107,6 +107,34 @@ def get_cat_display(cat_name):
     else:
         return cat_name
 
+def save_callback():
+    amt = st.session_state.get('input_amount', 0.0)
+    cat = st.session_state.get('input_category', "")
+    typ = st.session_state.get('input_type', "")
+    note = st.session_state.get('input_note', "")
+    dt = st.session_state.get('input_date', date.today())
+
+    if amt > 0 and cat:
+        db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+
+        backend.add_record(current_ledger_id, dt, db_type, cat, amt, note)
+        st.success("Saved!")
+    else:
+        st.error("Please fill all fields")
+
+def add_cat_callback():
+    new_c = st.session_state['new_cat_input']
+    if new_c and backend.add_category(current_ledger_id, new_c):
+        st.toast(f"{T('msg_cat_added')}: {new_c}")
+        st.session_state['new_cat_input'] = ""
+
+
+def del_cat_callback():
+    del_c = st.session_state['del_cat_select']
+    if del_c:
+        backend.delete_category(current_ledger_id, del_c)
+        st.toast(f"{T('msg_cat_deleted')}: {del_c}")
+
 
 def T(key):
     lang = st.session_state.get('language_code', 'EN')
@@ -143,88 +171,96 @@ with st.sidebar:
     st.divider()
 
     st.title(T("sidebar_title"))
-    with st.expander("➕ 记一笔 (New Entry)", expanded=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            date = st.date_input(...)
-            typ = st.selectbox(...)
-        with c2:
-            cat = st.selectbox(...)
-            amt = st.number_input(...)
-
-        note = st.text_input(...)
-        st.button("保存 (Save)", use_container_width=True)
 
     selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
 
     if selected_ledger_name:
         current_ledger_id = ledger_map[selected_ledger_name]
+        st.session_state['active_ledger_id'] = current_ledger_id
     else:
         st.stop()
 
     with st.expander(T("ledger_settings")):
         l_tab1, l_tab2 = st.tabs([T("tab_add"), T("tab_del")])
-
         with l_tab1:
             new_ledger_name = st.text_input(T("input_new_ledger"), key="new_ledger_input")
             if st.button(T("btn_create_ledger")):
                 if new_ledger_name and new_ledger_name not in ledger_names:
-                    if backend.add_ledger(new_ledger_name):
-                        st.success("OK")
-                        st.rerun()
-                elif new_ledger_name in ledger_names:
-                    st.error("Exists / 已存在")
-
+                    backend.add_ledger(new_ledger_name)
+                    st.rerun()
         with l_tab2:
             st.warning(T("warn_del_ledger"))
             ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
+            if st.button(T("btn_del_ledger")):
+                backend.delete_ledger(ledger_map[ledger_to_del])
+                st.rerun()
 
-            confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
-            confirm_del = st.checkbox(confirm_text, key="del_confirm")
+    st.divider()
 
-            if st.button(T("btn_del_ledger"), disabled=not confirm_del):
-                del_id = ledger_map[ledger_to_del]
-                success, msg = backend.delete_ledger(del_id)
-                if success:
-                    st.success(msg)
+    with st.expander(T("cat_manage")):
+        current_categories = backend.get_categories(current_ledger_id)
+        c_tab1, c_tab2 = st.tabs([T("tab_add"), T("tab_del")])
+        with c_tab1:
+            st.text_input(T("input_new_cat"), key='new_cat_input')
+            st.button(T("btn_add_cat"), on_click=add_cat_callback)
+        with c_tab2:
+            st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
+            st.button(T("btn_del_cat"), on_click=del_cat_callback)
+
+
+st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
+
+with st.expander(T("header_entry"), expanded=True):
+    c1, c2 = st.columns(2)
+    with c1:
+        st.date_input(T("date") if "date" in TRANS else "日期", date.today(), key='input_date')
+
+        type_opts = ["支出", "收入"]
+        if st.session_state.get('language_code') == 'EN':
+            type_opts = ["Expense", "Income"]
+        st.selectbox(T("category"), type_opts, key='input_type')
+
+    with c2:
+        current_categories = backend.get_categories(current_ledger_id)
+        st.selectbox(T("category"), current_categories, format_func=get_cat_display, key='input_category')
+        st.number_input("金额 / Amount", min_value=0.0, step=0.01, format="%.2f", key='input_amount')
+
+    st.text_input("备注 / Note", key='input_note')
+
+    st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
+
+
+    with l_tab1:
+        new_ledger_name = st.text_input(T("input_new_ledger"), key="new_ledger_input")
+        if st.button(T("btn_create_ledger")):
+            if new_ledger_name and new_ledger_name not in ledger_names:
+                if backend.add_ledger(new_ledger_name):
+                    st.success("OK")
                     st.rerun()
-                else:
-                    st.error(msg)
+            elif new_ledger_name in ledger_names:
+                st.error("Exists / 已存在")
+
+    with l_tab2:
+        st.warning(T("warn_del_ledger"))
+        ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
+
+        confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
+        confirm_del = st.checkbox(confirm_text, key="del_confirm")
+
+        if st.button(T("btn_del_ledger"), disabled=not confirm_del):
+            del_id = ledger_map[ledger_to_del]
+            success, msg = backend.delete_ledger(del_id)
+            if success:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
 
     st.divider()
 
     st.header(f"{T('header_entry')}")
 
     current_categories = backend.get_categories(current_ledger_id)
-
-    def save_callback():
-        amt = st.session_state.get('input_amount', 0.0)
-        cat = st.session_state.get('input_category', "")
-        typ = st.session_state.get('input_type', "")
-        note = st.session_state.get('input_note', "")
-        dt = date.today()
-
-        if amt > 0 and cat:
-            db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
-
-            backend.add_record(current_ledger_id, dt, db_type, cat, amt, note)
-            st.success("Saved!")
-        else:
-            st.error("Please fill all fields")
-
-    def add_cat_callback():
-        new_c = st.session_state['new_cat_input']
-        if new_c and backend.add_category(current_ledger_id, new_c):
-            st.toast(f"{T('msg_cat_added')}: {new_c}")
-            st.session_state['new_cat_input'] = ""
-
-
-    def del_cat_callback():
-        del_c = st.session_state['del_cat_select']
-        if del_c:
-            backend.delete_category(current_ledger_id, del_c)
-            st.toast(f"{T('msg_cat_deleted')}: {del_c}")
-
 
     st.date_input(T("date"), key='input_date')
 
