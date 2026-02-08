@@ -290,10 +290,6 @@ with tab1:
         exp_mask = df['type'].isin(['支出', 'Expense'])
         inc_mask = df['type'].isin(['收入', 'Income'])
 
-        total_exp = df[exp_mask]['amount'].sum()
-        total_inc = df[inc_mask]['amount'].sum()
-        balance = total_inc - total_exp
-
         if st.session_state.get('language_code') == 'EN':
             df.loc[exp_mask, 'type'] = "Expense"
             df.loc[inc_mask, 'type'] = "Income"
@@ -308,7 +304,10 @@ with tab1:
         if sel_type != T("all"):
             df = df[df['type'] == sel_type]
 
-        inc, exp, bal = backend.get_summary(df)
+        # === 修复重点：直接在这里计算，不调用 backend ===
+        inc = df[df['type'].isin(['收入', 'Income'])]['amount'].sum()
+        exp = df[df['type'].isin(['支出', 'Expense'])]['amount'].sum()
+        bal = inc - exp
 
         m1, m2, m3 = st.columns(3)
         m1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}")
