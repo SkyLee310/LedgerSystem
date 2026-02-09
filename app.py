@@ -25,19 +25,19 @@ st.markdown("""
     /* 2. 优化顶部留白 */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 
-    /* 3. Metric 卡片样式化 (关键 UX 优化) */
+    /* 3. Metric 卡片样式化 (修复版：适配深色模式) */
     div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #f0f2f6;
+        background-color: #262730; /* 改成深灰色，适配深色模式 */
+        border: 1px solid #464b5c; /* 边框颜色调深 */
         padding: 15px 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* 阴影加深一点 */
         transition: transform 0.2s;
     }
     div[data-testid="stMetric"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.08);
-        border-color: #d1d5db;
+        box-shadow: 0 6px 8px rgba(0,0,0,0.5);
+        border-color: #808495;
     }
 
     /* 4. 让 Tab 标题更大更清晰 */
