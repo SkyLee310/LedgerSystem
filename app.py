@@ -30,15 +30,7 @@ st.markdown("""
         padding: 15px 20px;
         border-radius: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: transform 0.2s;
     }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
-        border-color: #808495;
-    }
-
-    button[data-baseweb="tab"] { font-size: 16px; font-weight: 600; }
 
     /* 日历样式 */
     .calendar-container { width: 100%; overflow-x: auto; }
@@ -51,8 +43,8 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.2s ease;
     }
     .cal-card:hover { transform: translateY(-2px); background-color: #363645; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-    .cal-card.pos { background-color: #00C897; color: white; box-shadow: 0 4px 10px rgba(0, 200, 151, 0.3); }
-    .cal-card.neg { background-color: #FF5C5C; color: white; box-shadow: 0 4px 10px rgba(255, 92, 92, 0.3); }
+    .cal-card.pos { background-color: #00C897; color: white; }
+    .cal-card.neg { background-color: #FF5C5C; color: white; }
     .cal-card.today { border: 2px solid #FFD700; }
     .cal-day-num { font-size: 1rem; font-weight: 600; align-self: flex-start; }
     .cal-val { font-size: 0.85rem; font-weight: bold; align-self: flex-end; }
@@ -107,20 +99,17 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
         daily_net = df_calc.groupby('date')['calc_amount'].sum().to_dict()
 
     cal = calendar.Calendar(firstweekday=6)
-    if mode == 'Month':
-        month_days = cal.monthdayscalendar(year, month)
-    else:
+    month_days = cal.monthdayscalendar(year, month)
+
+    if mode == 'Week':
         sel_dt = pd.to_datetime(selected_date).date()
-        all_weeks = cal.monthdayscalendar(year, month)
         target_week = []
-        found = False
-        for week in all_weeks:
+        for week in month_days:
             if sel_dt.day in week and week[week.index(sel_dt.day)] != 0:
                 target_week = week
-                found = True
                 break
-        if not found:
-            month_days = all_weeks
+        if not target_week:
+            month_days = cal.monthdayscalendar(year, month)  # Fallback
         else:
             month_days = [target_week]
 
@@ -144,6 +133,7 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
                 elif val < 0:
                     card_class += " neg"
                 if current_date_str == today_str: card_class += " today"
+
                 val_display = ""
                 if val != 0:
                     prefix = "+" if val > 0 else ""
@@ -154,7 +144,7 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
     return html
 
 
-# === 5. 程序入口 ===
+# === 5. Sidebar & Main ===
 backend.init_db()
 all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
@@ -162,7 +152,7 @@ ledger_map = {L[1]: L[0] for L in all_ledgers}
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2920/2920349.png", width=50)
-    st.markdown("### " + lang.T("sidebar_title"))  # 使用 lang.T
+    st.markdown("### " + lang.T("sidebar_title"))
     st.radio("Language", ["CN", "EN"], horizontal=True, label_visibility="collapsed", key="language_code")
 
     if ledger_names:
@@ -213,7 +203,6 @@ with st.expander(lang.T("header_entry"), expanded=True):
         st.selectbox(lang.T("category"), type_opts, key='input_type', label_visibility="visible")
     with c3:
         current_cats = backend.get_categories(current_ledger_id)
-        # 使用 lang.get_cat_display
         st.selectbox(lang.T("category"), current_cats, format_func=lang.get_cat_display,
                      key=f'input_category_{st.session_state.get("language_code")}')
     with c4: st.number_input(lang.T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
@@ -221,23 +210,28 @@ with st.expander(lang.T("header_entry"), expanded=True):
     st.button(lang.T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
 # =========================================================
-# 🔥 全局数据翻译层
+# 🔥 修复：增强版全局数据翻译 (使用 replace 代替 map)
 # =========================================================
 raw_df = backend.get_all_records(current_ledger_id)
 
 if not raw_df.empty:
     current_lang = st.session_state.get('language_code', 'CN')
 
+    # 0. 清洗数据：去除可能存在的首尾空格，确保匹配成功
+    raw_df['category'] = raw_df['category'].astype(str).str.strip()
+
     if current_lang == 'EN':
+        # 1. Type 翻译
         raw_df['type'] = raw_df['type'].replace(['支出', 'Expense'], 'Expense')
         raw_df['type'] = raw_df['type'].replace(['收入', 'Income'], 'Income')
-        # 使用 lang.CAT_TRANS
-        raw_df['category'] = raw_df['category'].map(lang.CAT_TRANS).fillna(raw_df['category'])
+
+        # 2. Category 翻译 (使用 replace，没找到的保留原样)
+        raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS)
     else:
+        # CN 模式
         raw_df['type'] = raw_df['type'].replace(['Expense', '支出'], '支出')
         raw_df['type'] = raw_df['type'].replace(['Income', '收入'], '收入')
-        # 使用 lang.CAT_TRANS_REV
-        raw_df['category'] = raw_df['category'].map(lang.CAT_TRANS_REV).fillna(raw_df['category'])
+        raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS_REV)
 
 # 选项卡
 tab_overview, tab_stats, tab_data, tab_report = st.tabs(
@@ -247,7 +241,7 @@ if raw_df.empty:
     st.info(lang.T("empty"))
     st.stop()
 
-# === Tab 1: 概览 ===
+# === Tab 1: 概览 (修复饼图) ===
 with tab_overview:
     inc_key = '收入' if current_lang == 'CN' else 'Income'
     exp_key = '支出' if current_lang == 'CN' else 'Expense'
@@ -266,13 +260,8 @@ with tab_overview:
     with c_chart1:
         st.subheader("📊 " + ("收支构成" if current_lang == 'CN' else "Composition"))
 
+        # 🔥 再次确保饼图数据是翻译过的
         df_pie = raw_df.copy()
-
-        if current_lang == 'EN':
-            df_pie['category'] = df_pie['category'].map(lang.CAT_TRANS).fillna(df_pie['category'])
-        else:
-            df_pie['category'] = df_pie['category'].map(lang.CAT_TRANS_REV).fillna(df_pie['category'])
-
         chart_data = df_pie.groupby('category')['amount'].sum().reset_index()
 
         fig_pie = px.pie(chart_data, values='amount', names='category', hole=0.5)
@@ -394,6 +383,8 @@ with tab_report:
             rc3.metric(lang.T("balance"), f"{CURRENCY} {r_bal:,.2f}")
 
             st.subheader(lang.T("cat_breakdown"))
+
+            # 报告页分类翻译修复
             cat_summary = rep_df.groupby(['category', 'type'])['amount'].sum().reset_index().sort_values('amount',
                                                                                                          ascending=False)
 
@@ -423,6 +414,7 @@ with tab_report:
                 }
             )
 
+            st.subheader(lang.T("download_excel"))
             clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
             excel_data = backend.to_excel(clean_export_df)
 
