@@ -2,126 +2,118 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import backend
-from datetime import date, timedelta
+from datetime import date
 
-# === 1. 页面配置 ===
-# 必须是第一个 Streamlit 命令
+# === 1. 页面配置 (必须在最前面) ===
 st.set_page_config(
-    page_title="My Ledger System",
-    page_icon="📓",
+    page_title="My Ledger Pro",
+    page_icon="💳",
     layout="wide",
-    initial_sidebar_state="auto"  # 手机自动收起，电脑自动展开
+    initial_sidebar_state="auto"
 )
 
 CURRENCY = "RM"
 
+# === 2. 核心 UI 样式优化 (CSS) ===
+# 这里我们注入 CSS 来美化 Metric 卡片和调整间距
+st.markdown("""
+    <style>
+    /* 1. 隐藏多余的菜单和页脚 */
+    #MainMenu {visibility: hidden;} 
+    footer {visibility: hidden;}
+
+    /* 2. 优化顶部留白 */
+    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+
+    /* 3. Metric 卡片样式化 (关键 UX 优化) */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #f0f2f6;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+        transition: transform 0.2s;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0,0,0,0.08);
+        border-color: #d1d5db;
+    }
+
+    /* 4. 让 Tab 标题更大更清晰 */
+    button[data-baseweb="tab"] {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# === 3. 语言包与辅助函数 ===
 TRANS = {
-    # 侧边栏 & 标题
-    "app_title": {"CN": "账本系统", "EN": "My Ledger System"},
-    "sidebar_title": {"CN": "📚 账本", "EN": "📚 Ledger"},
-    "lang_select": {"CN": "语言 / Language", "EN": "Language / 语言"},
-    "current_ledger": {"CN": "📖 当前账本", "EN": "📖 Current Ledger"},
+    "app_title": {"CN": "我的账本", "EN": "My Ledger Pro"},
+    "sidebar_title": {"CN": "📚 账本列表", "EN": "📚 Ledgers"},
+    "current_ledger": {"CN": "当前账本", "EN": "Current Ledger"},
 
-    # 账本设置
-    "ledger_settings": {"CN": "⚙️ 账本设置 (新增/删除)", "EN": "⚙️ Ledger Settings"},
-    "tab_add": {"CN": "新增", "EN": "Add"},
-    "tab_del": {"CN": "删除", "EN": "Delete"},
-    "input_new_ledger": {"CN": "输入新账本名称", "EN": "New Ledger Name"},
-    "btn_create_ledger": {"CN": "创建新账本", "EN": "Create Ledger"},
-    "warn_del_ledger": {"CN": "⚠️ 高危操作：删除账本将永久清除该账本下的所有数据！",
-                        "EN": "⚠️ Danger: Deleting a ledger will wipe all its data!"},
-    "select_del_ledger": {"CN": "选择要删除的账本", "EN": "Select Ledger to Delete"},
-    "confirm_del_check": {"CN": "我确认要删除", "EN": "I confirm to delete"},
-    "btn_del_ledger": {"CN": "🔴 确认删除账本", "EN": "🔴 Delete Ledger"},
+    # 概览卡片
+    "total_income": {"CN": "总收入", "EN": "Total Income"},
+    "total_expense": {"CN": "总支出", "EN": "Total Expense"},
+    "balance": {"CN": "结余", "EN": "Net Balance"},
 
-    # 记账输入
-    "header_entry": {"CN": "📝 记一笔", "EN": "📝 New Transaction"},
+    # 记账区
+    "header_entry": {"CN": "✨ 记一笔", "EN": "✨ New Transaction"},
     "date": {"CN": "日期", "EN": "Date"},
-    "type": {"CN": "类型", "EN": "Type"},
     "category": {"CN": "分类", "EN": "Category"},
     "amount": {"CN": "金额", "EN": "Amount"},
     "note": {"CN": "备注", "EN": "Note"},
-    "btn_save": {"CN": "💾 保存记录", "EN": "💾 Save Record"},
-    "msg_saved": {"CN": "✅ 已保存！", "EN": "✅ Saved!"},
-    "msg_amount_error": {"CN": "⚠️ 金额必须大于 0", "EN": "⚠️ Amount must be > 0"},
-    "msg_no_cat": {"CN": "请先添加分类", "EN": "Please add category first"},
+    "btn_save": {"CN": "💾 立即保存", "EN": "💾 Save Record"},
 
-    # 分类管理
-    "cat_manage": {"CN": "🏷️ 分类管理 (新增/撤销)", "EN": "🏷️ Categories"},
-    "input_new_cat": {"CN": "新分类名", "EN": "New Category Name"},
-    "btn_add_cat": {"CN": "确认添加", "EN": "Add Category"},
-    "select_del_cat": {"CN": "撤销分类", "EN": "Remove Category"},
-    "btn_del_cat": {"CN": "确认删除", "EN": "Delete Category"},
-    "msg_cat_added": {"CN": "分类已添加", "EN": "Category Added"},
-    "msg_cat_deleted": {"CN": "分类已删除", "EN": "Category Deleted"},
+    # 标签页
+    "tab_overview": {"CN": "📊 概览", "EN": "📊 Dashboard"},
+    "tab_stats": {"CN": "📉 分析", "EN": "📉 Analytics"},
+    "tab_data": {"CN": "📋 明细", "EN": "📋 Records"},
 
-    # 主看板
-    "dashboard_title": {"CN": "财务看板", "EN": "Dashboard"},
-    "tab_overview": {"CN": "📊 账本概览", "EN": "📊 Overview"},
-    "tab_export": {"CN": "📥 数据导出", "EN": "📥 Export"},
-
-    # 筛选与统计
-    "filter_expand": {"CN": "🔍 筛选数据", "EN": "🔍 Filter Data"},
-    "filter_cat": {"CN": "分类筛选", "EN": "Filter by Category"},
-    "filter_type": {"CN": "类型筛选", "EN": "Filter by Type"},
-    "total_income": {"CN": "总收入", "EN": "Total Income"},
-    "total_expense": {"CN": "总支出", "EN": "Total Expense"},
-    "balance": {"CN": "结余", "EN": "Balance"},
+    # 筛选
+    "filter_label": {"CN": "🔍 筛选与搜索", "EN": "🔍 Filter & Search"},
+    "filter_cat": {"CN": "按分类", "EN": "By Category"},
+    "filter_type": {"CN": "按类型", "EN": "By Type"},
     "all": {"CN": "全部", "EN": "All"},
 
-    # 图表与列表
-    "header_list": {"CN": "📋 账本明细", "EN": "📋 Transactions"},
-    "header_chart": {"CN": "📊 分布", "EN": "📊 Distribution"},
-    "no_expense": {"CN": "无支出数据", "EN": "No Expense Data"},
-    "del_record_expand": {"CN": "🗑️ 删除某条记录", "EN": "🗑️ Delete Record"},
-    "select_record": {"CN": "选择记录", "EN": "Select Record"},
-    "btn_del_record": {"CN": "删除选中项", "EN": "Delete Selected"},
-    "empty_ledger": {"CN": "账本还是空的，快去记一笔吧！", "EN": "Ledger is empty, add a record!"},
+    # 设置
+    "settings": {"CN": "⚙️ 设置", "EN": "⚙️ Settings"},
+    "create_ledger": {"CN": "创建新账本", "EN": "Create Ledger"},
+    "manage_cats": {"CN": "分类管理", "EN": "Categories"},
 
-    # 导出
-    "header_export": {"CN": "📥 导出当前账本", "EN": "📥 Export Ledger"},
-    "start_date": {"CN": "开始", "EN": "Start"},
-    "end_date": {"CN": "结束", "EN": "End"},
-    "found_records": {"CN": "共找到 {} 条记录", "EN": "Found {} records"},
-    "btn_download": {"CN": "⬇️ 下载 Excel", "EN": "⬇️ Download Excel"},
-
-    # 通用词汇
-    "Income": {"CN": "收入", "EN": "Income"},
-    "Expense": {"CN": "支出", "EN": "Expense"},
-
-    # === 统计页面 ===
-    "tab_stats": {"CN": "📈 数据统计", "EN": "📈 Statistics"},
-    "chart_trend": {"CN": "📅 收支趋势 (按月)", "EN": "📅 Monthly Trend"},
-    "chart_rank": {"CN": "🏆 支出排行榜", "EN": "🏆 Expense Ranking"},
+    # 提示
+    "welcome": {"CN": "欢迎回来！", "EN": "Welcome Back!"},
+    "empty": {"CN": "暂无数据，快去记一笔吧！", "EN": "No records yet. Add one now!"}
 }
 
 CAT_TRANS = {
-    "餐饮": "Food & Dining",
-    "交通": "Transport",
-    "购物": "Shopping",
-    "居住": "Housing",
-    "工资": "Salary",
-    "娱乐": "Entertainment",
-    "医疗": "Medical",
-    "其他": "Others"
+    "餐饮": "🍔 Food", "交通": "🚗 Transport", "购物": "🛍️ Shopping",
+    "居住": "🏠 Housing", "工资": "💰 Salary", "娱乐": "🎮 Fun",
+    "医疗": "💊 Medical", "其他": "📦 Others"
 }
 
 
 def T(key):
     lang = st.session_state.get('language_code', 'EN')
-    if key in TRANS:
-        return TRANS[key][lang]
-    return key
+    return TRANS.get(key, {}).get(lang, key)
 
 
 def get_cat_display(cat_name):
     lang = st.session_state.get('language_code', 'CN')
-    if lang == 'EN':
-        return CAT_TRANS.get(cat_name, cat_name)
-    else:
-        return cat_name
+    if lang == 'EN': return CAT_TRANS.get(cat_name, cat_name)
+    return cat_name
 
 
+# 统一配色方案 (UX 统一性)
+COLOR_MAP = {
+    "收入": "#00CC96", "Income": "#00CC96",  # 绿色
+    "支出": "#EF553B", "Expense": "#EF553B"  # 红色
+}
+
+
+# === 4. 回调函数 ===
 def save_callback():
     lang = st.session_state.get('language_code', 'CN')
     amt = st.session_state.get('input_amount', 0.0)
@@ -134,18 +126,16 @@ def save_callback():
     if active_id and amt > 0 and cat:
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
         backend.save_record(active_id, dt, db_type, cat, amt, note)
-        st.success("Saved!")
+        st.toast("✅ " + ("已保存!" if lang == 'CN' else "Saved Successfully!"))
     elif amt <= 0:
         st.error("Amount must be > 0")
-    else:
-        st.error("Please check inputs")
 
 
 def add_cat_callback():
     new_c = st.session_state.get('new_cat_input')
     active_id = st.session_state.get('active_ledger_id')
     if active_id and new_c and backend.add_category(active_id, new_c):
-        st.toast(f"{T('msg_cat_added')}: {new_c}")
+        st.toast(f"Tag added: {new_c}")
         st.session_state['new_cat_input'] = ""
 
 
@@ -154,267 +144,225 @@ def del_cat_callback():
     active_id = st.session_state.get('active_ledger_id')
     if active_id and del_c:
         backend.delete_category(active_id, del_c)
-        st.toast(f"{T('msg_cat_deleted')}: {del_c}")
+        st.toast(f"Tag removed: {del_c}")
 
 
-# === 2. 安全的 CSS 样式 ===
-# 只隐藏 footer 和 hamburger，但不隐藏 header 整体
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;} 
-            footer {visibility: hidden;}
-            /* header {visibility: hidden;}  <-- 这一行已被永久移除 */
-
-            .block-container {
-                padding-top: 2rem;
-            }
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
+# === 5. 程序入口 ===
 backend.init_db()
-
 all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
 ledger_map = {L[1]: L[0] for L in all_ledgers}
 
-# === 3. Sidebar 内容 ===
+# --- Sidebar ---
 with st.sidebar:
-    st.radio("🌐 Language", ["CN", "EN"], horizontal=True, key="language_code")
-    st.divider()
+    st.image("https://cdn-icons-png.flaticon.com/512/2920/2920349.png", width=50)  # Logo 占位
+    st.markdown("### " + T("sidebar_title"))
 
-    st.title(T("sidebar_title"))
+    # 语言切换 (使用 segmented control 更好看，但需要较新版 streamlit，这里用 radio horizontal)
+    st.radio("Language", ["CN", "EN"], horizontal=True, label_visibility="collapsed", key="language_code")
 
-    selected_ledger_name = None
     if ledger_names:
         selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
         current_ledger_id = ledger_map[selected_ledger_name]
         st.session_state['active_ledger_id'] = current_ledger_id
     else:
-        st.warning("No Ledgers Found / 未找到账本")
-
-    with st.expander(T("ledger_settings")):
-        l_tab1, l_tab2 = st.tabs([T("tab_add"), T("tab_del")])
-
-        with l_tab1:
-            new_ledger_name = st.text_input(T("input_new_ledger"), key="new_ledger_input")
-            if st.button(T("btn_create_ledger")):
-                if new_ledger_name and new_ledger_name not in ledger_names:
-                    if backend.add_ledger(new_ledger_name):
-                        st.success("OK")
-                        st.rerun()
-                elif new_ledger_name in ledger_names:
-                    st.error("Exists / 已存在")
-
-        with l_tab2:
-            st.warning(T("warn_del_ledger"))
-            if ledger_names:
-                ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
-                confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
-                confirm_del = st.checkbox(confirm_text, key="del_confirm")
-
-                if st.button(T("btn_del_ledger"), disabled=not confirm_del):
-                    del_id = ledger_map[ledger_to_del]
-                    success, msg = backend.delete_ledger(del_id)
-                    if success:
-                        st.success(msg)
-                        st.rerun()
-                    else:
-                        st.error(msg)
+        st.warning("⚠️ No Ledgers")
+        current_ledger_id = None
+        selected_ledger_name = None
 
     st.divider()
 
-    if selected_ledger_name:
-        with st.expander(T("cat_manage")):
-            current_categories = backend.get_categories(current_ledger_id)
-            c_tab1, c_tab2 = st.tabs([T("tab_add"), T("tab_del")])
-            with c_tab1:
-                st.text_input(T("input_new_cat"), key='new_cat_input')
-                st.button(T("btn_add_cat"), on_click=add_cat_callback)
-            with c_tab2:
-                st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
-                st.button(T("btn_del_cat"), on_click=del_cat_callback)
+    # 折叠式设置菜单 (保持侧边栏整洁)
+    with st.expander(T("settings")):
+        # 1. 新建账本
+        st.caption(T("create_ledger"))
+        new_ledger_name = st.text_input("Name", key="new_ledger_input", label_visibility="collapsed",
+                                        placeholder="New Ledger Name")
+        if st.button("➕ " + T("create_ledger"), use_container_width=True):
+            if new_ledger_name and new_ledger_name not in ledger_names:
+                backend.add_ledger(new_ledger_name)
+                st.rerun()
 
-# === 4. 主界面标题逻辑 ===
-if 'active_ledger_id' in st.session_state:
-    # 重新获取最新的账本列表以确保名称对应正确
-    all_ledgers = backend.get_ledgers()
-    ledger_map_rev = {L[0]: L[1] for L in all_ledgers}
-    current_name = ledger_map_rev.get(st.session_state.active_ledger_id, "")
-    st.title(f"💰 {current_name} - {T('dashboard_title')}")
+        st.divider()
+
+        # 2. 删除账本
+        if ledger_names:
+            ledger_to_del = st.selectbox("Delete Ledger", ledger_names, key="del_ledger_select")
+            if st.button("🗑️ Delete", type="primary", use_container_width=True):
+                backend.delete_ledger(ledger_map[ledger_to_del])
+                st.rerun()
+
+    if selected_ledger_name:
+        with st.expander(T("manage_cats")):
+            current_categories = backend.get_categories(current_ledger_id)
+            c1, c2 = st.tabs(["➕ Add", "➖ Del"])
+            with c1:
+                st.text_input("New Cat", key='new_cat_input', label_visibility="collapsed", placeholder="Name...")
+                st.button("Add", on_click=add_cat_callback, use_container_width=True)
+            with c2:
+                st.selectbox("Del Cat", current_categories, key='del_cat_select', label_visibility="collapsed")
+                st.button("Remove", on_click=del_cat_callback, type="primary", use_container_width=True)
+
+# --- Main Content ---
+
+# 标题栏
+if selected_ledger_name:
+    st.title(f"{selected_ledger_name}")
+    st.caption(f"{date.today().strftime('%Y-%m-%d')} | {T('welcome')}")
 else:
     st.title(T("app_title"))
-
-if not selected_ledger_name:
-    st.info("Please create a ledger in the sidebar first. / 请先在侧边栏创建一个账本。")
     st.stop()
 
-# === 5. 记账输入框 ===
+# 记账输入区 (放在顶部 Expander，默认展开)
 with st.expander(T("header_entry"), expanded=True):
-    c1, c2 = st.columns(2)
+    c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])  # 调整列宽比例
+
     with c1:
-        st.date_input(T("date") if "date" in TRANS else "日期", date.today(), key='input_date')
-
-        type_opts = ["支出", "收入"]
-        if st.session_state.get('language_code') == 'EN':
-            type_opts = ["Expense", "Income"]
-        st.selectbox(T("category"), type_opts, key='input_type')
-
+        st.date_input(T("date"), date.today(), key='input_date')
     with c2:
-        current_categories = backend.get_categories(current_ledger_id)
-        current_lang = st.session_state.get('language_code', 'CN')
-        st.selectbox(
-            T("category"),
-            current_categories,
-            format_func=get_cat_display,
-            key=f'input_category_{current_lang}'
+        type_opts = ["支出", "收入"] if st.session_state.get('language_code') == 'CN' else ["Expense", "Income"]
+        st.selectbox(T("category"), type_opts, key='input_type', label_visibility="visible")
+    with c3:
+        current_cats = backend.get_categories(current_ledger_id)
+        # 为分类添加默认 Emoji 前缀如果它没有的话 (纯 UI 优化)
+        st.selectbox(T("category"), current_cats, format_func=get_cat_display,
+                     key=f'input_category_{st.session_state.get("language_code")}')
+    with c4:
+        st.number_input(T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
+
+    st.text_input(T("note"), key='input_note', placeholder="e.g. Lunch with friends...")
+
+    # 保存按钮全宽
+    st.button(T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
+
+# 数据加载
+raw_df = backend.get_all_records(current_ledger_id)
+
+# 主要 Tabs
+tab_overview, tab_stats, tab_data = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_data")])
+
+if raw_df.empty:
+    st.info(T("empty"))
+    st.stop()
+
+# === Tab 1: 概览 (Cards + Simple Charts) ===
+with tab_overview:
+    # 1. 计算核心指标
+    inc = raw_df[raw_df['type'].isin(['收入', 'Income'])]['amount'].sum()
+    exp = raw_df[raw_df['type'].isin(['支出', 'Expense'])]['amount'].sum()
+    bal = inc - exp
+
+    # 2. 显示漂亮的指标卡片
+    col1, col2, col3 = st.columns(3)
+    col1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}", delta="Income")
+    col2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}", delta="-Expense", delta_color="inverse")
+    col3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}", delta="Net Worth", delta_color="off")
+
+    st.divider()
+
+    # 3. 概览图表 (左右布局)
+    c_chart1, c_chart2 = st.columns(2)
+
+    with c_chart1:
+        st.subheader("📊 " + ("收支构成" if st.session_state.get('language_code') == 'CN' else "Composition"))
+        # 环形图优化：去掉背景，增加空心
+        chart_data = raw_df.groupby('category')['amount'].sum().reset_index()
+        fig_pie = px.pie(chart_data, values='amount', names='category', hole=0.5)
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        fig_pie.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0))
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    with c_chart2:
+        st.subheader("📅 " + ("近期趋势" if st.session_state.get('language_code') == 'CN' else "Recent Trend"))
+        # 简单的折线图
+        daily_trend = raw_df.groupby('date')['amount'].sum().reset_index()
+        fig_line = px.area(daily_trend, x='date', y='amount', color_discrete_sequence=['#636EFA'])
+        fig_line.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
+        st.plotly_chart(fig_line, use_container_width=True)
+
+# === Tab 2: 深度分析 (Stacked Bar + Ranking) ===
+with tab_stats:
+    # 语言处理
+    df_viz = raw_df.copy()
+    if st.session_state.get('language_code') == 'EN':
+        df_viz['type'] = df_viz['type'].replace({'收入': 'Income', '支出': 'Expense'})
+        df_viz['category'] = df_viz['category'].map(CAT_TRANS).fillna(df_viz['category'])
+
+    df_viz['month'] = pd.to_datetime(df_viz['date']).dt.to_period('M').astype(str)
+    monthly_stats = df_viz.groupby(['month', 'type'])['amount'].sum().reset_index()
+
+    # 柱状图优化：自定义颜色
+    fig_bar = px.bar(
+        monthly_stats, x='month', y='amount', color='type',
+        barmode='group', text_auto='.2s',
+        color_discrete_map=COLOR_MAP,
+        title="Monthly Income vs Expense"
+    )
+    fig_bar.update_layout(xaxis_title="", yaxis_title="")
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.divider()
+
+    # 排行榜
+    exp_only = df_viz[df_viz['type'].isin(['支出', 'Expense'])]
+    if not exp_only.empty:
+        cat_rank = exp_only.groupby('category')['amount'].sum().reset_index().sort_values('amount', ascending=True)
+        fig_rank = px.bar(
+            cat_rank, y='category', x='amount', orientation='h',
+            text_auto='.2s', title="Where did money go?",
+            color='amount', color_continuous_scale='Reds'
         )
-        st.number_input(T("amount"), min_value=0.0, step=0.01, format="%.2f", key='input_amount')
+        fig_rank.update_layout(xaxis_title="", yaxis_title="")
+        st.plotly_chart(fig_rank, use_container_width=True)
 
-    st.text_input(T("note"), key='input_note')
-    st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
+# === Tab 3: 明细与筛选 (Smart Table) ===
+with tab_data:
+    with st.expander(T("filter_label"), expanded=False):
+        f1, f2 = st.columns(2)
+        sel_cats = f1.multiselect(T("filter_cat"), backend.get_categories(current_ledger_id),
+                                  format_func=get_cat_display)
 
-# === 6. 数据看板 Tabs ===
-tab1, tab2, tab3 = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_export")])
+        type_opts = [T("all")] + (
+            ["Expense", "Income"] if st.session_state.get('language_code') == 'EN' else ["支出", "收入"])
+        sel_type = f2.selectbox(T("filter_type"), type_opts)
 
-with tab1:
-    raw_df = backend.get_all_records(current_ledger_id)
+    # 筛选逻辑
+    df_show = raw_df.copy()
+    if sel_cats:
+        df_show = df_show[df_show['category'].isin(sel_cats)]
+    if sel_type != T("all"):
+        df_show = df_show[df_show['type'] == sel_type]
 
-    if not raw_df.empty:
-        with st.expander(T("filter_expand"), expanded=False):
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                all_cats = backend.get_categories(current_ledger_id)
-                sel_cats = st.multiselect(
-                    T("filter_cat"),
-                    all_cats,
-                    default=[],
-                    format_func=get_cat_display,
-                    placeholder=T("filter_cat")
-                )
-            with col2:
-                type_filter_opts = [T("all")] + (
-                    ["Expense", "Income"] if st.session_state.get('language_code') == 'EN' else ["支出", "收入"])
-                sel_type = st.selectbox(T("filter_type"), type_filter_opts)
-
-        df = raw_df.copy()
-
-        exp_mask = df['type'].isin(['支出', 'Expense'])
-        inc_mask = df['type'].isin(['收入', 'Income'])
-
-        if st.session_state.get('language_code') == 'EN':
-            df.loc[exp_mask, 'type'] = "Expense"
-            df.loc[inc_mask, 'type'] = "Income"
-            df['category'] = df['category'].map(CAT_TRANS).fillna(df['category'])
-        else:
-            df.loc[exp_mask, 'type'] = "支出"
-            df.loc[inc_mask, 'type'] = "收入"
-
-        if sel_cats:
-            df = df[df['category'].isin(sel_cats)]
-
-        if sel_type != T("all"):
-            df = df[df['type'] == sel_type]
-
-        inc = df[df['type'].isin(['收入', 'Income'])]['amount'].sum()
-        exp = df[df['type'].isin(['支出', 'Expense'])]['amount'].sum()
-        bal = inc - exp
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}")
-        m2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}")
-        m3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}")
-        st.divider()
-
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.subheader(T("header_list"))
-            st.dataframe(df[['date', 'type', 'category', 'amount', 'note']], use_container_width=True)
-
-        with c2:
-            st.subheader(T("header_chart"))
-            exp_condition = df['type'].astype(str).str.contains('支出|Expense', case=False, na=False)
-            exp_df = df[exp_condition]
-
-            if not exp_df.empty:
-                chart_data = exp_df.groupby('category')['amount'].sum().reset_index()
-                fig = px.pie(chart_data, values='amount', names='category', hole=0.4)
-                fig.update_layout(
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
-                    margin=dict(l=0, r=0, t=30, b=0)
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info(T("no_expense"))
-
-        st.divider()
-
-        with st.expander(T("del_record_expand")):
-            del_opts = {f"{r['date']} | {r['category']} | {CURRENCY} {r['amount']:.2f}": r['id'] for i, r in
-                        raw_df.iterrows()}
-            if del_opts:
-                sel_lbl = st.selectbox(T("select_record"), options=del_opts.keys())
-                if st.button(T("btn_del_record")):
-                    backend.delete_record(del_opts[sel_lbl])
-                    st.success("OK")
-                    st.rerun()
-    else:
-        st.info(T("empty_ledger"))
-
-with tab2:
-    st.subheader(T("chart_trend"))
-    stat_df = backend.get_all_records(current_ledger_id)
-
-    if not stat_df.empty:
-        stat_df['month'] = pd.to_datetime(stat_df['date']).dt.to_period('M').astype(str)
-        monthly_data = stat_df.groupby(['month', 'type'])['amount'].sum().reset_index()
-
-        color_map = {
-            "收入": "#2ecc71", "Income": "#2ecc71",
-            "支出": "#e74c3c", "Expense": "#e74c3c"
+    # UX 重点：使用 column_config 美化表格
+    st.dataframe(
+        df_show,
+        use_container_width=True,
+        hide_index=True,
+        column_order=("date", "type", "category", "amount", "note", "id"),
+        column_config={
+            "id": st.column_config.NumberColumn("ID", help="Unique ID"),
+            "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
+            "type": st.column_config.TextColumn(T("type"), width="small"),
+            "category": st.column_config.TextColumn(T("category"), width="medium"),
+            "amount": st.column_config.NumberColumn(
+                T("amount"),
+                format=f"{CURRENCY} %.2f",  # 自动显示货币符号
+                step=0.01
+            ),
+            "note": st.column_config.TextColumn(T("note"), width="large"),
         }
+    )
 
-        fig_trend = px.bar(
-            monthly_data, x='month', y='amount', color='type',
-            barmode='group', color_discrete_map=color_map, text_auto='.2s',
-            title="Monthly Income vs Expense"
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
-
-        st.divider()
-        st.subheader(T("chart_rank"))
-
-        exp_df = stat_df[stat_df['type'].astype(str).str.contains('支出|Expense', case=False)]
-        if not exp_df.empty:
-            cat_rank = exp_df.groupby('category')['amount'].sum().reset_index().sort_values('amount', ascending=True)
-            if st.session_state.get('language_code') == 'EN':
-                cat_rank['category'] = cat_rank['category'].map(CAT_TRANS).fillna(cat_rank['category'])
-
-            fig_rank = px.bar(
-                cat_rank, x='amount', y='category', orientation='h',
-                text_auto='.2s', title="Top Expense Categories",
-                color='amount', color_continuous_scale='Reds'
-            )
-            st.plotly_chart(fig_rank, use_container_width=True)
-        else:
-            st.info(T("no_expense"))
-    else:
-        st.info(T("empty_ledger"))
-
-with tab3:
-    st.subheader(T("header_export"))
-    d1, d2 = st.columns(2)
-    s_date = d1.date_input(T("start_date"), date.today() - timedelta(days=30))
-    e_date = d2.date_input(T("end_date"), date.today())
-
-    if s_date <= e_date:
-        ex_df = backend.get_records_by_date_range(current_ledger_id, s_date, e_date)
-        st.write(T("found_records").format(len(ex_df)))
-        if not ex_df.empty:
-            excel_data = backend.to_excel(ex_df)
-            st.download_button(
-                label=T("btn_download"),
-                data=excel_data,
-                file_name=f'{selected_ledger_name}_{s_date}_{e_date}.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
+    # 简化的删除功能
+    st.divider()
+    c_del1, c_del2 = st.columns([3, 1])
+    with c_del1:
+        # 创建易读的选项列表
+        del_opts = {f"{r['date']} - {r['category']} - {r['amount']}": r['id'] for i, r in df_show.iterrows()}
+        sel_rec_label = st.selectbox("Select to delete / 选择删除", options=list(del_opts.keys()),
+                                     label_visibility="collapsed")
+    with c_del2:
+        if st.button("🗑️ " + T("tab_del"), type="secondary", use_container_width=True):
+            if sel_rec_label:
+                backend.delete_record(del_opts[sel_rec_label])
+                st.rerun()
