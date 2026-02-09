@@ -4,16 +4,13 @@ import plotly.express as px
 import backend
 from datetime import date, timedelta
 
-# === 1. 初始化 Sidebar 状态 (必须在 set_page_config 之前或作为其参数) ===
-if 'sidebar_state' not in st.session_state:
-    st.session_state.sidebar_state = 'expanded'
-
-# === 2. 配置页面，绑定状态 ===
+# === 1. 页面配置 ===
+# 必须是第一个 Streamlit 命令
 st.set_page_config(
     page_title="My Ledger System",
     page_icon="📓",
     layout="wide",
-    initial_sidebar_state=st.session_state.sidebar_state  # 关键点：绑定状态
+    initial_sidebar_state="auto"  # 手机自动收起，电脑自动展开
 )
 
 CURRENCY = "RM"
@@ -24,7 +21,6 @@ TRANS = {
     "sidebar_title": {"CN": "📚 账本", "EN": "📚 Ledger"},
     "lang_select": {"CN": "语言 / Language", "EN": "Language / 语言"},
     "current_ledger": {"CN": "📖 当前账本", "EN": "📖 Current Ledger"},
-    "toggle_sidebar": {"CN": "📂 显示/隐藏侧边栏", "EN": "📂 Toggle Sidebar"},  # 新增翻译
 
     # 账本设置
     "ledger_settings": {"CN": "⚙️ 账本设置 (新增/删除)", "EN": "⚙️ Ledger Settings"},
@@ -93,13 +89,10 @@ TRANS = {
     "Income": {"CN": "收入", "EN": "Income"},
     "Expense": {"CN": "支出", "EN": "Expense"},
 
-    # === 新增：统计页面 ===
+    # === 统计页面 ===
     "tab_stats": {"CN": "📈 数据统计", "EN": "📈 Statistics"},
     "chart_trend": {"CN": "📅 收支趋势 (按月)", "EN": "📅 Monthly Trend"},
     "chart_rank": {"CN": "🏆 支出排行榜", "EN": "🏆 Expense Ranking"},
-    "stat_bar_mode": {"CN": "显示模式", "EN": "Display Mode"},
-    "mode_group": {"CN": "分组对比", "EN": "Grouped"},
-    "mode_stack": {"CN": "堆叠显示", "EN": "Stacked"}
 }
 
 CAT_TRANS = {
@@ -164,15 +157,14 @@ def del_cat_callback():
         st.toast(f"{T('msg_cat_deleted')}: {del_c}")
 
 
-# === 3. 修复 CSS：移除 header 隐藏，保留其他隐藏 ===
+# === 2. 安全的 CSS 样式 ===
+# 只隐藏 footer 和 hamburger，但不隐藏 header 整体
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;} 
             footer {visibility: hidden;}
-            /* 重点修复：下面这行已被注释掉，这样手机端的汉堡菜单和电脑端的箭头才会出现 */
-            /* header {visibility: hidden;} */
+            /* header {visibility: hidden;}  <-- 这一行已被永久移除 */
 
-            /* 如果你想让顶部更紧凑，可以调整 padding，而不是隐藏 header */
             .block-container {
                 padding-top: 2rem;
             }
@@ -186,14 +178,13 @@ all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
 ledger_map = {L[1]: L[0] for L in all_ledgers}
 
-# === 4. Sidebar 内容 ===
+# === 3. Sidebar 内容 ===
 with st.sidebar:
     st.radio("🌐 Language", ["CN", "EN"], horizontal=True, key="language_code")
     st.divider()
 
     st.title(T("sidebar_title"))
 
-    # 如果账本列表为空，防止报错
     selected_ledger_name = None
     if ledger_names:
         selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
@@ -201,7 +192,6 @@ with st.sidebar:
         st.session_state['active_ledger_id'] = current_ledger_id
     else:
         st.warning("No Ledgers Found / 未找到账本")
-        # 默认允许创建一个
 
     with st.expander(T("ledger_settings")):
         l_tab1, l_tab2 = st.tabs([T("tab_add"), T("tab_del")])
@@ -245,27 +235,21 @@ with st.sidebar:
                 st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
                 st.button(T("btn_del_cat"), on_click=del_cat_callback)
 
-# === 5. 主界面顶部按钮：用于切换 Sidebar ===
-col_btn, col_title = st.columns([1, 5])
-with col_btn:
-    if st.button(T("toggle_sidebar")):
-        if st.session_state.sidebar_state == 'expanded':
-            st.session_state.sidebar_state = 'collapsed'
-        else:
-            st.session_state.sidebar_state = 'expanded'
-        st.rerun()
-
-with col_title:
-    if selected_ledger_name:
-        st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
-    else:
-        st.title(T("app_title"))
+# === 4. 主界面标题逻辑 ===
+if 'active_ledger_id' in st.session_state:
+    # 重新获取最新的账本列表以确保名称对应正确
+    all_ledgers = backend.get_ledgers()
+    ledger_map_rev = {L[0]: L[1] for L in all_ledgers}
+    current_name = ledger_map_rev.get(st.session_state.active_ledger_id, "")
+    st.title(f"💰 {current_name} - {T('dashboard_title')}")
+else:
+    st.title(T("app_title"))
 
 if not selected_ledger_name:
     st.info("Please create a ledger in the sidebar first. / 请先在侧边栏创建一个账本。")
     st.stop()
 
-# 📱 手机适配版记账框 (放在主界面顶部)
+# === 5. 记账输入框 ===
 with st.expander(T("header_entry"), expanded=True):
     c1, c2 = st.columns(2)
     with c1:
@@ -290,6 +274,7 @@ with st.expander(T("header_entry"), expanded=True):
     st.text_input(T("note"), key='input_note')
     st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
 
+# === 6. 数据看板 Tabs ===
 tab1, tab2, tab3 = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_export")])
 
 with tab1:
