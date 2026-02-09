@@ -414,7 +414,6 @@ with tab_report:
                 }
             )
 
-            st.subheader(lang.T("download_excel"))
             clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
             excel_data = backend.to_excel(clean_export_df)
 
