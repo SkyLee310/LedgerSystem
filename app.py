@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import backend
+import calendar
 from datetime import date
 
-# === 1. 页面配置 (必须在最前面) ===
+# === 1. 页面配置 ===
 st.set_page_config(
     page_title="My Ledger Pro",
     page_icon="💳",
@@ -15,23 +16,19 @@ st.set_page_config(
 CURRENCY = "RM"
 
 # === 2. 核心 UI 样式优化 (CSS) ===
-# 这里我们注入 CSS 来美化 Metric 卡片和调整间距
 st.markdown("""
     <style>
-    /* 1. 隐藏多余的菜单和页脚 */
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;}
-
-    /* 2. 优化顶部留白 */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 
-    /* 3. Metric 卡片样式化 (修复版：适配深色模式) */
+    /* Metric 卡片样式 */
     div[data-testid="stMetric"] {
-        background-color: #262730; /* 改成深灰色，适配深色模式 */
-        border: 1px solid #464b5c; /* 边框颜色调深 */
+        background-color: #262730; 
+        border: 1px solid #464b5c; 
         padding: 15px 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* 阴影加深一点 */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         transition: transform 0.2s;
     }
     div[data-testid="stMetric"]:hover {
@@ -40,52 +37,98 @@ st.markdown("""
         border-color: #808495;
     }
 
-    /* 4. 让 Tab 标题更大更清晰 */
     button[data-baseweb="tab"] {
         font-size: 16px;
         font-weight: 600;
     }
+
+    /* === 日历组件样式 === */
+    .calendar-container {
+        width: 100%;
+        overflow-x: auto; /* 手机端支持横向滚动 */
+    }
+    .cal-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 4px;
+        color: inherit;
+    }
+    .cal-th {
+        text-align: center;
+        padding: 8px;
+        font-size: 0.9rem;
+        color: #888;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .cal-td {
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 8px;
+        vertical-align: top;
+        height: 90px; /* 格子高度 */
+        min-width: 70px; /* 最小宽度，防止手机上太挤 */
+        background-color: #1e1e1e;
+        position: relative;
+        transition: 0.2s;
+    }
+    .cal-td:hover {
+        background-color: #2d2d2d;
+        border-color: #555;
+    }
+    .cal-day-num {
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-bottom: 4px;
+        display: block;
+    }
+    .cal-val {
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: block;
+        margin-top: 10px;
+    }
+    .val-pos { color: #00CC96; } /* 绿色 */
+    .val-neg { color: #EF553B; } /* 红色 */
+    .cal-empty { background: transparent; border: none; }
+
+    /* 周视图特殊调整 */
+    .week-view .cal-td { height: 120px; }
     </style>
     """, unsafe_allow_html=True)
 
-# === 3. 语言包与辅助函数 ===
+# === 3. 语言包 ===
 TRANS = {
     "app_title": {"CN": "我的账本", "EN": "My Ledger Pro"},
     "sidebar_title": {"CN": "📚 账本列表", "EN": "📚 Ledgers"},
     "current_ledger": {"CN": "当前账本", "EN": "Current Ledger"},
-
-    # 概览卡片
     "total_income": {"CN": "总收入", "EN": "Total Income"},
     "total_expense": {"CN": "总支出", "EN": "Total Expense"},
     "balance": {"CN": "结余", "EN": "Net Balance"},
-
-    # 记账区
     "header_entry": {"CN": "✨ 记一笔", "EN": "✨ New Transaction"},
     "date": {"CN": "日期", "EN": "Date"},
     "category": {"CN": "分类", "EN": "Category"},
     "amount": {"CN": "金额", "EN": "Amount"},
     "note": {"CN": "备注", "EN": "Note"},
     "btn_save": {"CN": "💾 立即保存", "EN": "💾 Save Record"},
-
-    # 标签页
     "tab_overview": {"CN": "📊 概览", "EN": "📊 Dashboard"},
-    "tab_stats": {"CN": "📉 分析", "EN": "📉 Analytics"},
+    "tab_stats": {"CN": "📅 统计日历", "EN": "📅 Calendar & Stats"},  # 修改了这里
     "tab_data": {"CN": "📋 明细", "EN": "📋 Records"},
-
-    # 筛选
     "filter_label": {"CN": "🔍 筛选与搜索", "EN": "🔍 Filter & Search"},
     "filter_cat": {"CN": "按分类", "EN": "By Category"},
     "filter_type": {"CN": "按类型", "EN": "By Type"},
     "all": {"CN": "全部", "EN": "All"},
-
-    # 设置
     "settings": {"CN": "⚙️ 设置", "EN": "⚙️ Settings"},
     "create_ledger": {"CN": "创建新账本", "EN": "Create Ledger"},
     "manage_cats": {"CN": "分类管理", "EN": "Categories"},
-
-    # 提示
     "welcome": {"CN": "欢迎回来！", "EN": "Welcome Back!"},
-    "empty": {"CN": "暂无数据，快去记一笔吧！", "EN": "No records yet. Add one now!"}
+    "empty": {"CN": "暂无数据，快去记一笔吧！", "EN": "No records yet. Add one now!"},
+
+    # 日历相关
+    "cal_view": {"CN": "视图模式", "EN": "View Mode"},
+    "view_month": {"CN": "月视图", "EN": "Month"},
+    "view_week": {"CN": "周视图", "EN": "Week"},
+    "cal_date": {"CN": "选择日期", "EN": "Select Date"}
 }
 
 CAT_TRANS = {
@@ -106,11 +149,7 @@ def get_cat_display(cat_name):
     return cat_name
 
 
-# 统一配色方案 (UX 统一性)
-COLOR_MAP = {
-    "收入": "#00CC96", "Income": "#00CC96",  # 绿色
-    "支出": "#EF553B", "Expense": "#EF553B"  # 红色
-}
+COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Expense": "#EF553B"}
 
 
 # === 4. 回调函数 ===
@@ -147,18 +186,95 @@ def del_cat_callback():
         st.toast(f"Tag removed: {del_c}")
 
 
-# === 5. 程序入口 ===
+# === 5. 日历生成函数 (核心逻辑) ===
+def render_calendar_html(year, month, df_data, mode='Month', selected_date=None):
+    # 1. 准备数据字典 { '2023-10-01': 100.50 }
+    daily_net = {}
+    if not df_data.empty:
+        # 转换金额：收入为正，支出为负
+        df_calc = df_data.copy()
+        df_calc['calc_amount'] = df_calc.apply(
+            lambda x: x['amount'] if x['type'] in ['收入', 'Income'] else -x['amount'], axis=1)
+        daily_net = df_calc.groupby('date')['calc_amount'].sum().to_dict()
+
+    # 2. 生成日历网格
+    cal = calendar.Calendar(firstweekday=6)  # 0=Mon, 6=Sun
+
+    if mode == 'Month':
+        month_days = cal.monthdayscalendar(year, month)
+    else:  # Week Mode
+        # 找到选中日期所在的那一周
+        sel_dt = pd.to_datetime(selected_date).date()
+        all_weeks = cal.monthdayscalendar(year, month)
+        target_week = []
+
+        # 简单的查找逻辑：先尝试在当月找
+        found = False
+        for week in all_weeks:
+            if sel_dt.day in week and week[week.index(sel_dt.day)] != 0:
+                target_week = week
+                found = True
+                break
+
+        # 如果是跨月周（例如选中了上个月的最后几天显示在当前月视图里），这里简化处理：
+        # 实际上 monthdayscalendar 会返回 0，所以我们重新构建一个周列表
+        if not found:
+            # 如果没在当前月找到（理论上 selected_date 传进来就是 year/month），这里做一个容错
+            month_days = all_weeks
+        else:
+            month_days = [target_week]
+
+    # 3. 构建 HTML
+    week_days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    html = '<div class="calendar-container"><table class="cal-table">'
+
+    # 表头
+    html += '<thead><tr>'
+    for w in week_days:
+        html += f'<th class="cal-th">{w}</th>'
+    html += '</tr></thead>'
+
+    # 表体
+    html += '<tbody class="week-view" >' if mode == 'Week' else '<tbody>'
+
+    for week in month_days:
+        html += '<tr>'
+        for day in week:
+            if day == 0:
+                html += '<td class="cal-td cal-empty"></td>'
+            else:
+                # 构建日期字符串 YYYY-MM-DD
+                current_date_str = f"{year}-{month:02d}-{day:02d}"
+                val = daily_net.get(current_date_str, 0)
+
+                # 颜色逻辑
+                val_class = "val-pos" if val >= 0 else "val-neg"
+                val_display = ""
+                if val != 0:
+                    val_display = f'<span class="cal-val {val_class}">{CURRENCY} {val:,.0f}</span>'
+
+                # 今天的日期高亮 (可选)
+                bg_style = 'style="border: 2px solid #00CC96;"' if current_date_str == str(date.today()) else ""
+
+                html += f'<td class="cal-td" {bg_style}>'
+                html += f'<span class="cal-day-num">{day}</span>'
+                html += val_display
+                html += '</td>'
+        html += '</tr>'
+
+    html += '</tbody></table></div>'
+    return html
+
+
+# === 6. 程序入口 ===
 backend.init_db()
 all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
 ledger_map = {L[1]: L[0] for L in all_ledgers}
 
-# --- Sidebar ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2920/2920349.png", width=50)  # Logo 占位
+    st.image("https://cdn-icons-png.flaticon.com/512/2920/2920349.png", width=50)
     st.markdown("### " + T("sidebar_title"))
-
-    # 语言切换 (使用 segmented control 更好看，但需要较新版 streamlit，这里用 radio horizontal)
     st.radio("Language", ["CN", "EN"], horizontal=True, label_visibility="collapsed", key="language_code")
 
     if ledger_names:
@@ -171,10 +287,7 @@ with st.sidebar:
         selected_ledger_name = None
 
     st.divider()
-
-    # 折叠式设置菜单 (保持侧边栏整洁)
     with st.expander(T("settings")):
-        # 1. 新建账本
         st.caption(T("create_ledger"))
         new_ledger_name = st.text_input("Name", key="new_ledger_input", label_visibility="collapsed",
                                         placeholder="New Ledger Name")
@@ -182,10 +295,7 @@ with st.sidebar:
             if new_ledger_name and new_ledger_name not in ledger_names:
                 backend.add_ledger(new_ledger_name)
                 st.rerun()
-
         st.divider()
-
-        # 2. 删除账本
         if ledger_names:
             ledger_to_del = st.selectbox("Delete Ledger", ledger_names, key="del_ledger_select")
             if st.button("🗑️ Delete", type="primary", use_container_width=True):
@@ -203,109 +313,86 @@ with st.sidebar:
                 st.selectbox("Del Cat", current_categories, key='del_cat_select', label_visibility="collapsed")
                 st.button("Remove", on_click=del_cat_callback, type="primary", use_container_width=True)
 
-# --- Main Content ---
-
-# 标题栏
 if selected_ledger_name:
     st.title(f"{selected_ledger_name}")
-    st.caption(f"{date.today().strftime('%Y-%m-%d')} | {T('welcome')}")
 else:
     st.title(T("app_title"))
     st.stop()
 
-# 记账输入区 (放在顶部 Expander，默认展开)
+# 记账区
 with st.expander(T("header_entry"), expanded=True):
-    c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])  # 调整列宽比例
-
-    with c1:
-        st.date_input(T("date"), date.today(), key='input_date')
+    c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])
+    with c1: st.date_input(T("date"), date.today(), key='input_date')
     with c2:
         type_opts = ["支出", "收入"] if st.session_state.get('language_code') == 'CN' else ["Expense", "Income"]
         st.selectbox(T("category"), type_opts, key='input_type', label_visibility="visible")
     with c3:
         current_cats = backend.get_categories(current_ledger_id)
-        # 为分类添加默认 Emoji 前缀如果它没有的话 (纯 UI 优化)
         st.selectbox(T("category"), current_cats, format_func=get_cat_display,
                      key=f'input_category_{st.session_state.get("language_code")}')
-    with c4:
-        st.number_input(T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
-
+    with c4: st.number_input(T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
     st.text_input(T("note"), key='input_note', placeholder="e.g. Lunch with friends...")
-
-    # 保存按钮全宽
     st.button(T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
-# 数据加载
 raw_df = backend.get_all_records(current_ledger_id)
-
-# 主要 Tabs
 tab_overview, tab_stats, tab_data = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_data")])
 
 if raw_df.empty:
     st.info(T("empty"))
     st.stop()
 
-# === Tab 1: 概览 (Cards + Simple Charts) ===
+# === Tab 1: 概览 ===
 with tab_overview:
-    # 1. 计算核心指标
     inc = raw_df[raw_df['type'].isin(['收入', 'Income'])]['amount'].sum()
     exp = raw_df[raw_df['type'].isin(['支出', 'Expense'])]['amount'].sum()
     bal = inc - exp
 
-    # === 修复版：强制颜色 ===
     col1, col2, col3 = st.columns(3)
-
-    # 收入 (Income)：绿色
-    col1.metric(
-        T("total_income"),
-        f"{CURRENCY} {inc:,.2f}",
-        delta="Income",
-        delta_color="normal"  # 正常模式：默认绿色（如果 delta 没被解析为负数）
-    )
-
-    # 支出 (Expense)：红色
-    # 技巧：我们将 delta 设置为负值字符串，Streamlit 会将其渲染为红色
-    col2.metric(
-        T("total_expense"),
-        f"{CURRENCY} {exp:,.2f}",
-        delta=f"-{exp:,.2f}",  # 重点：前面加个负号，让它变红
-        delta_color="normal"  # 正常模式下，负数就是红色
-    )
-
-    # 结余 (Balance)：动态颜色
-    # 如果结余 > 0 绿色，< 0 红色
-    col3.metric(
-        T("balance"),
-        f"{CURRENCY} {bal:,.2f}",
-        delta=f"{bal:,.2f}",
-        delta_color="normal"
-    )
+    col1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}", delta="Income", delta_color="normal")
+    col2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}", delta=f"-{exp:,.2f}", delta_color="normal")
+    col3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}", delta=f"{bal:,.2f}", delta_color="normal")
 
     st.divider()
-
-    # 3. 概览图表 (左右布局)
     c_chart1, c_chart2 = st.columns(2)
-
     with c_chart1:
         st.subheader("📊 " + ("收支构成" if st.session_state.get('language_code') == 'CN' else "Composition"))
-        # 环形图优化：去掉背景，增加空心
         chart_data = raw_df.groupby('category')['amount'].sum().reset_index()
         fig_pie = px.pie(chart_data, values='amount', names='category', hole=0.5)
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
         fig_pie.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig_pie, use_container_width=True)
-
     with c_chart2:
         st.subheader("📅 " + ("近期趋势" if st.session_state.get('language_code') == 'CN' else "Recent Trend"))
-        # 简单的折线图
         daily_trend = raw_df.groupby('date')['amount'].sum().reset_index()
         fig_line = px.area(daily_trend, x='date', y='amount', color_discrete_sequence=['#636EFA'])
         fig_line.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
         st.plotly_chart(fig_line, use_container_width=True)
 
-# === Tab 2: 深度分析 (Stacked Bar + Ranking) ===
+# === Tab 2: 统计日历 (NEW) ===
 with tab_stats:
-    # 语言处理
+    # 1. 控制栏
+    cc1, cc2 = st.columns([1, 2])
+    with cc1:
+        # 视图切换：月 / 周
+        v_mode_label = [T("view_month"), T("view_week")]
+        v_mode_sel = st.radio(T("cal_view"), v_mode_label, horizontal=True)
+        # 映射回代码逻辑需要的 'Month' / 'Week'
+        mode_code = 'Month' if v_mode_sel == T("view_month") else 'Week'
+    with cc2:
+        # 日期选择器
+        pick_date = st.date_input(T("cal_date"), date.today())
+
+    st.divider()
+
+    # 2. 生成并显示日历
+    # 提取选中的年和月
+    cal_html = render_calendar_html(pick_date.year, pick_date.month, raw_df, mode=mode_code, selected_date=pick_date)
+    st.markdown(cal_html, unsafe_allow_html=True)
+
+    st.divider()
+    st.subheader("📈 " + T("tab_stats"))  # 原有的图表放在下面
+
+    # 原有的柱状图逻辑...
     df_viz = raw_df.copy()
     if st.session_state.get('language_code') == 'EN':
         df_viz['type'] = df_viz['type'].replace({'收入': 'Income', '支出': 'Expense'})
@@ -314,76 +401,45 @@ with tab_stats:
     df_viz['month'] = pd.to_datetime(df_viz['date']).dt.to_period('M').astype(str)
     monthly_stats = df_viz.groupby(['month', 'type'])['amount'].sum().reset_index()
 
-    # 柱状图优化：自定义颜色
     fig_bar = px.bar(
         monthly_stats, x='month', y='amount', color='type',
-        barmode='group', text_auto='.2s',
-        color_discrete_map=COLOR_MAP,
-        title="Monthly Income vs Expense"
+        barmode='group', text_auto='.2s', color_discrete_map=COLOR_MAP
     )
-    fig_bar.update_layout(xaxis_title="", yaxis_title="")
+    fig_bar.update_layout(xaxis_title="", yaxis_title="", margin=dict(t=10, b=0, l=0, r=0))
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    st.divider()
-
-    # 排行榜
-    exp_only = df_viz[df_viz['type'].isin(['支出', 'Expense'])]
-    if not exp_only.empty:
-        cat_rank = exp_only.groupby('category')['amount'].sum().reset_index().sort_values('amount', ascending=True)
-        fig_rank = px.bar(
-            cat_rank, y='category', x='amount', orientation='h',
-            text_auto='.2s', title="Where did money go?",
-            color='amount', color_continuous_scale='Reds'
-        )
-        fig_rank.update_layout(xaxis_title="", yaxis_title="")
-        st.plotly_chart(fig_rank, use_container_width=True)
-
-# === Tab 3: 明细与筛选 (Smart Table) ===
+# === Tab 3: 明细 ===
 with tab_data:
     with st.expander(T("filter_label"), expanded=False):
         f1, f2 = st.columns(2)
         sel_cats = f1.multiselect(T("filter_cat"), backend.get_categories(current_ledger_id),
                                   format_func=get_cat_display)
-
         type_opts = [T("all")] + (
             ["Expense", "Income"] if st.session_state.get('language_code') == 'EN' else ["支出", "收入"])
         sel_type = f2.selectbox(T("filter_type"), type_opts)
 
-    # 筛选逻辑
     df_show = raw_df.copy()
-    if sel_cats:
-        df_show = df_show[df_show['category'].isin(sel_cats)]
-    if sel_type != T("all"):
-        df_show = df_show[df_show['type'] == sel_type]
+    if sel_cats: df_show = df_show[df_show['category'].isin(sel_cats)]
+    if sel_type != T("all"): df_show = df_show[df_show['type'] == sel_type]
 
-    # UX 重点：使用 column_config 美化表格
     st.dataframe(
         df_show,
-        use_container_width=True,
-        hide_index=True,
+        use_container_width=True, hide_index=True,
         column_order=("date", "type", "category", "amount", "note", "id"),
         column_config={
-            "id": st.column_config.NumberColumn("ID", help="Unique ID"),
+            "id": st.column_config.NumberColumn("ID"),
             "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
             "type": st.column_config.TextColumn(T("type"), width="small"),
             "category": st.column_config.TextColumn(T("category"), width="medium"),
-            "amount": st.column_config.NumberColumn(
-                T("amount"),
-                format=f"{CURRENCY} %.2f",  # 自动显示货币符号
-                step=0.01
-            ),
+            "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f", step=0.01),
             "note": st.column_config.TextColumn(T("note"), width="large"),
         }
     )
-
-    # 简化的删除功能
     st.divider()
     c_del1, c_del2 = st.columns([3, 1])
     with c_del1:
-        # 创建易读的选项列表
         del_opts = {f"{r['date']} - {r['category']} - {r['amount']}": r['id'] for i, r in df_show.iterrows()}
-        sel_rec_label = st.selectbox("Select to delete / 选择删除", options=list(del_opts.keys()),
-                                     label_visibility="collapsed")
+        sel_rec_label = st.selectbox("Select to delete", options=list(del_opts.keys()), label_visibility="collapsed")
     with c_del2:
         if st.button("🗑️ " + T("tab_del"), type="secondary", use_container_width=True):
             if sel_rec_label:
