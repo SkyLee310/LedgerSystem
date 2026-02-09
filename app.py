@@ -102,7 +102,7 @@ TRANS = {
     "rep_monthly": {"CN": "月报 (Monthly)", "EN": "Monthly"},
     "rep_yearly": {"CN": "年报 (Yearly)", "EN": "Yearly"},
     "sel_week": {"CN": "选择周 (点击该周任意一天)", "EN": "Select Week (Pick any day)"},
-    "sel_month": {"CN": "选择月份", "EN": "Select Month"},
+    "sel_month": {"CN": "选择月份 (点击该月任意一天)", "EN": "Select Month"},
     "sel_year": {"CN": "选择年份", "EN": "Select Year"},
     "gen_report": {"CN": "生成报告", "EN": "Generate Report"},
     "summary": {"CN": "汇总摘要", "EN": "Summary"},
@@ -493,15 +493,13 @@ with tab_report:
                 }
             )
 
-            # 4. Excel 导出 (净化版)
-            st.subheader(T("download_excel"))
 
             # 关键：导出前把 ID 列去掉，只保留用户关心的列
             clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
             excel_data = backend.to_excel(clean_export_df)
 
             st.download_button(
-                label=f"📥 {T('download_excel')}",
+                label=f"{T('download_excel')}",
                 data=excel_data,
                 file_name=f'Report_{start_date}_{end_date}.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
