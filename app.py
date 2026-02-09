@@ -13,7 +13,7 @@ st.set_page_config(
     page_title="My Ledger System",
     page_icon="📓",
     layout="wide",
-    initial_sidebar_state=st.session_state.sidebar_state
+    initial_sidebar_state=st.session_state.sidebar_state  # 关键点：绑定状态
 )
 
 CURRENCY = "RM"
@@ -248,9 +248,11 @@ with st.sidebar:
 # === 5. 主界面顶部按钮：用于切换 Sidebar ===
 col_btn, col_title = st.columns([1, 5])
 with col_btn:
-    # 这是一个功能按钮，点击后反转 sidebar 状态并刷新页面
     if st.button(T("toggle_sidebar")):
-        st.session_state.sidebar_state = 'collapsed' if st.session_state.sidebar_state == 'expanded' else 'expanded'
+        if st.session_state.sidebar_state == 'expanded':
+            st.session_state.sidebar_state = 'collapsed'
+        else:
+            st.session_state.sidebar_state = 'expanded'
         st.rerun()
 
 with col_title:
