@@ -416,10 +416,6 @@ with tab_report:
                 }
             )
 
-            # === 🔥 专业版导出逻辑 (Clean & Split) ===
-            st.subheader(lang.T("download_excel"))
-
-            # 1. 复制一份专门用于导出的数据
             export_df = rep_df.copy()
 
 

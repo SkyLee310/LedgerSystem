@@ -47,7 +47,7 @@ TRANS = {
     "gen_report": {"CN": "生成报告", "EN": "Generate Report"},
     "summary": {"CN": "汇总摘要", "EN": "Summary"},
     "cat_breakdown": {"CN": "分类详情", "EN": "Category Breakdown"},
-    "download_excel": {"CN": "📥 导出 Excel 专业报告", "EN": "📥 Download Professional Excel"},
+    "download_excel": {"CN": "📥 导出 Excel 财务报告", "EN": "📥 Download Excel Financial Report"},
 
     # Excel 表头
     "col_date": {"CN": "日期", "EN": "Date"},
