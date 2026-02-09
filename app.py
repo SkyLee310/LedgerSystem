@@ -357,7 +357,7 @@ with tab_report:
             start_date = sel_d.replace(day=1)
             next_month = start_date.replace(day=28) + timedelta(days=4)
             end_date = next_month - timedelta(days=next_month.day)
-            filter_desc = f"Month: {start_date.strftime('%Y-%m')}"
+            filter_desc = f"Month: {start_date.strftime('%Y/%m')}"
         elif report_mode == lang.T("rep_yearly"):
             sel_year = st.selectbox(lang.T("sel_year"), range(date.today().year, 2020, -1))
             start_date = date(sel_year, 1, 1)
