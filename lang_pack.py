@@ -51,9 +51,9 @@ TRANS = {
 }
 
 CAT_TRANS = {
-    "餐饮": "🍔 Food", "交通": "🚗 Transport", "购物": "🛍️ Shopping",
-    "居住": "🏠 Housing", "工资": "💰 Salary", "娱乐": "🎮 Fun",
-    "医疗": "💊 Medical", "其他": "📦 Others"
+    "🍔 餐饮": "🍔 Food", "🚗 交通": "🚗 Transport", "🛍️ 购物": "🛍️ Shopping",
+    "🏠 居住": "🏠 Housing", "💰 工资": "💰 Salary", "🎮 娱乐": "🎮 Fun",
+    "💊 医疗": "💊 Medical", "📦 其他": "📦 Others"
 }
 CAT_TRANS_REV = {v: k for k, v in CAT_TRANS.items()}
 
