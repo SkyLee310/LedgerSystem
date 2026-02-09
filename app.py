@@ -4,6 +4,17 @@ import plotly.express as px
 import backend
 from datetime import date, timedelta
 
+# === 1. 初始化 Sidebar 状态 (必须在 set_page_config 之前或作为其参数) ===
+if 'sidebar_state' not in st.session_state:
+    st.session_state.sidebar_state = 'expanded'
+
+# === 2. 配置页面，绑定状态 ===
+st.set_page_config(
+    page_title="My Ledger System",
+    page_icon="📓",
+    layout="wide",
+    initial_sidebar_state=st.session_state.sidebar_state
+)
 
 CURRENCY = "RM"
 
@@ -13,6 +24,7 @@ TRANS = {
     "sidebar_title": {"CN": "📚 账本", "EN": "📚 Ledger"},
     "lang_select": {"CN": "语言 / Language", "EN": "Language / 语言"},
     "current_ledger": {"CN": "📖 当前账本", "EN": "📖 Current Ledger"},
+    "toggle_sidebar": {"CN": "📂 显示/隐藏侧边栏", "EN": "📂 Toggle Sidebar"},  # 新增翻译
 
     # 账本设置
     "ledger_settings": {"CN": "⚙️ 账本设置 (新增/删除)", "EN": "⚙️ Ledger Settings"},
@@ -88,7 +100,6 @@ TRANS = {
     "stat_bar_mode": {"CN": "显示模式", "EN": "Display Mode"},
     "mode_group": {"CN": "分组对比", "EN": "Grouped"},
     "mode_stack": {"CN": "堆叠显示", "EN": "Stacked"}
-
 }
 
 CAT_TRANS = {
@@ -101,7 +112,6 @@ CAT_TRANS = {
     "医疗": "Medical",
     "其他": "Others"
 }
-
 
 
 def T(key):
@@ -118,21 +128,18 @@ def get_cat_display(cat_name):
     else:
         return cat_name
 
+
 def save_callback():
     lang = st.session_state.get('language_code', 'CN')
     amt = st.session_state.get('input_amount', 0.0)
     cat = st.session_state.get(f'input_category_{lang}', "")
     typ = st.session_state.get('input_type', "")
     note = st.session_state.get('input_note', "")
-
     dt = st.session_state.get('input_date', date.today())
-
     active_id = st.session_state.get('active_ledger_id')
 
     if active_id and amt > 0 and cat:
-
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
-
         backend.add_record(active_id, dt, db_type, cat, amt, note)
         st.success("Saved!")
     elif amt <= 0:
@@ -157,18 +164,17 @@ def del_cat_callback():
         st.toast(f"{T('msg_cat_deleted')}: {del_c}")
 
 
-st.set_page_config(page_title="My Ledger System", page_icon="📓", layout="wide")
-
+# === 3. 修复 CSS：移除 header 隐藏，保留其他隐藏 ===
 hide_st_style = """
             <style>
-            #MainMenu {visibility: hidden;}
+            #MainMenu {visibility: hidden;} 
             footer {visibility: hidden;}
-            header {visibility: hidden;}
+            /* 重点修复：下面这行已被注释掉，这样手机端的汉堡菜单和电脑端的箭头才会出现 */
+            /* header {visibility: hidden;} */
+
+            /* 如果你想让顶部更紧凑，可以调整 padding，而不是隐藏 header */
             .block-container {
-                padding-top: 1rem;
-                padding-bottom: 1rem;
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
+                padding-top: 2rem;
             }
             </style>
             """
@@ -180,19 +186,22 @@ all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
 ledger_map = {L[1]: L[0] for L in all_ledgers}
 
+# === 4. Sidebar 内容 ===
 with st.sidebar:
     st.radio("🌐 Language", ["CN", "EN"], horizontal=True, key="language_code")
     st.divider()
 
     st.title(T("sidebar_title"))
 
-    selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
-
-    if selected_ledger_name:
+    # 如果账本列表为空，防止报错
+    selected_ledger_name = None
+    if ledger_names:
+        selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
         current_ledger_id = ledger_map[selected_ledger_name]
         st.session_state['active_ledger_id'] = current_ledger_id
     else:
-        st.stop()
+        st.warning("No Ledgers Found / 未找到账本")
+        # 默认允许创建一个
 
     with st.expander(T("ledger_settings")):
         l_tab1, l_tab2 = st.tabs([T("tab_add"), T("tab_del")])
@@ -209,32 +218,50 @@ with st.sidebar:
 
         with l_tab2:
             st.warning(T("warn_del_ledger"))
-            ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
-            confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
-            confirm_del = st.checkbox(confirm_text, key="del_confirm")
+            if ledger_names:
+                ledger_to_del = st.selectbox(T("select_del_ledger"), ledger_names, key="del_ledger_select")
+                confirm_text = f"{T('confirm_del_check')} '{ledger_to_del}'"
+                confirm_del = st.checkbox(confirm_text, key="del_confirm")
 
-            if st.button(T("btn_del_ledger"), disabled=not confirm_del):
-                del_id = ledger_map[ledger_to_del]
-                success, msg = backend.delete_ledger(del_id)
-                if success:
-                    st.success(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
+                if st.button(T("btn_del_ledger"), disabled=not confirm_del):
+                    del_id = ledger_map[ledger_to_del]
+                    success, msg = backend.delete_ledger(del_id)
+                    if success:
+                        st.success(msg)
+                        st.rerun()
+                    else:
+                        st.error(msg)
 
     st.divider()
 
-    with st.expander(T("cat_manage")):
-        current_categories = backend.get_categories(current_ledger_id)
-        c_tab1, c_tab2 = st.tabs([T("tab_add"), T("tab_del")])
-        with c_tab1:
-            st.text_input(T("input_new_cat"), key='new_cat_input')
-            st.button(T("btn_add_cat"), on_click=add_cat_callback)
-        with c_tab2:
-            st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
-            st.button(T("btn_del_cat"), on_click=del_cat_callback)
+    if selected_ledger_name:
+        with st.expander(T("cat_manage")):
+            current_categories = backend.get_categories(current_ledger_id)
+            c_tab1, c_tab2 = st.tabs([T("tab_add"), T("tab_del")])
+            with c_tab1:
+                st.text_input(T("input_new_cat"), key='new_cat_input')
+                st.button(T("btn_add_cat"), on_click=add_cat_callback)
+            with c_tab2:
+                st.selectbox(T("select_del_cat"), current_categories, key='del_cat_select')
+                st.button(T("btn_del_cat"), on_click=del_cat_callback)
 
-st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
+# === 5. 主界面顶部按钮：用于切换 Sidebar ===
+col_btn, col_title = st.columns([1, 5])
+with col_btn:
+    # 这是一个功能按钮，点击后反转 sidebar 状态并刷新页面
+    if st.button(T("toggle_sidebar")):
+        st.session_state.sidebar_state = 'collapsed' if st.session_state.sidebar_state == 'expanded' else 'expanded'
+        st.rerun()
+
+with col_title:
+    if selected_ledger_name:
+        st.title(f"💰 {selected_ledger_name} - {T('dashboard_title')}")
+    else:
+        st.title(T("app_title"))
+
+if not selected_ledger_name:
+    st.info("Please create a ledger in the sidebar first. / 请先在侧边栏创建一个账本。")
+    st.stop()
 
 # 📱 手机适配版记账框 (放在主界面顶部)
 with st.expander(T("header_entry"), expanded=True):
@@ -249,7 +276,6 @@ with st.expander(T("header_entry"), expanded=True):
 
     with c2:
         current_categories = backend.get_categories(current_ledger_id)
-
         current_lang = st.session_state.get('language_code', 'CN')
         st.selectbox(
             T("category"),
@@ -258,7 +284,6 @@ with st.expander(T("header_entry"), expanded=True):
             key=f'input_category_{current_lang}'
         )
         st.number_input(T("amount"), min_value=0.0, step=0.01, format="%.2f", key='input_amount')
-
 
     st.text_input(T("note"), key='input_note')
     st.button(T("btn_save"), on_click=save_callback, use_container_width=True, type="primary")
@@ -304,7 +329,6 @@ with tab1:
         if sel_type != T("all"):
             df = df[df['type'] == sel_type]
 
-        # === 修复重点：直接在这里计算，不调用 backend ===
         inc = df[df['type'].isin(['收入', 'Income'])]['amount'].sum()
         exp = df[df['type'].isin(['支出', 'Expense'])]['amount'].sum()
         bal = inc - exp
