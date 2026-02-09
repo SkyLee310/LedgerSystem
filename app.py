@@ -265,9 +265,19 @@ with tab_overview:
     c_chart1, c_chart2 = st.columns(2)
     with c_chart1:
         st.subheader("📊 " + ("收支构成" if current_lang == 'CN' else "Composition"))
-        chart_data = raw_df.groupby('category')['amount'].sum().reset_index()
+
+        df_pie = raw_df.copy()
+
+        if current_lang == 'EN':
+            df_pie['category'] = df_pie['category'].map(lang.CAT_TRANS).fillna(df_pie['category'])
+        else:
+            df_pie['category'] = df_pie['category'].map(lang.CAT_TRANS_REV).fillna(df_pie['category'])
+
+        chart_data = df_pie.groupby('category')['amount'].sum().reset_index()
+
         fig_pie = px.pie(chart_data, values='amount', names='category', hole=0.5)
         st.plotly_chart(fig_pie, use_container_width=True)
+
     with c_chart2:
         st.subheader("📅 " + ("近期趋势" if current_lang == 'CN' else "Trend"))
         daily_trend = raw_df.groupby('date')['amount'].sum().reset_index()
@@ -417,7 +427,7 @@ with tab_report:
             excel_data = backend.to_excel(clean_export_df)
 
             st.download_button(
-                label=f"📥 {lang.T('download_excel')}",
+                label=f"{lang.T('download_excel')}",
                 data=excel_data,
                 file_name=f'Report_{start_date}_{end_date}.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
