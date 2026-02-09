@@ -99,7 +99,7 @@ TRANS = {
     "rep_monthly": {"CN": "月报 (Monthly)", "EN": "Monthly"},
     "rep_yearly": {"CN": "年报 (Yearly)", "EN": "Yearly"},
     "sel_week": {"CN": "选择周 (点击该周任意一天)", "EN": "Select Week (Pick any day)"},
-    "sel_month": {"CN": "选择月份(点击该月任意一天)", "EN": "Select Month"},
+    "sel_month": {"CN": "选择月份 (点击该月任意一天)", "EN": "Select Month"},
     "sel_year": {"CN": "选择年份", "EN": "Select Year"},
     "gen_report": {"CN": "生成报告", "EN": "Generate Report"},
     "summary": {"CN": "汇总摘要", "EN": "Summary"},
@@ -464,7 +464,6 @@ with tab_report:
             st.dataframe(cat_summary, use_container_width=True)
 
             # C. 导出按钮
-            st.subheader(T("download_excel"))
             excel_data = backend.to_excel(rep_df)
             st.download_button(
                 label=f"{T('download_excel')}",
