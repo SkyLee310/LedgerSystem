@@ -336,7 +336,7 @@ with tab_data:
                 backend.delete_record(del_opts[sel_rec_label])
                 st.rerun()
 
-# === Tab 4: 财务报告 ===
+# === Tab 4: 财务报告 (专业版：去 Emoji + 收支分列) ===
 with tab_report:
     st.subheader(lang.T("report_type"))
     report_mode = st.radio("Mode", [lang.T("rep_weekly"), lang.T("rep_monthly"), lang.T("rep_yearly")], horizontal=True,
@@ -357,7 +357,7 @@ with tab_report:
             start_date = sel_d.replace(day=1)
             next_month = start_date.replace(day=28) + timedelta(days=4)
             end_date = next_month - timedelta(days=next_month.day)
-            filter_desc = f"Month: {start_date.strftime('%Y/%m')}"
+            filter_desc = f"Month: {start_date.strftime('%Y-%m')}"
         elif report_mode == lang.T("rep_yearly"):
             sel_year = st.selectbox(lang.T("sel_year"), range(date.today().year, 2020, -1))
             start_date = date(sel_year, 1, 1)
@@ -385,12 +385,10 @@ with tab_report:
             rc2.metric(lang.T("total_expense"), f"{CURRENCY} {r_exp:,.2f}")
             rc3.metric(lang.T("balance"), f"{CURRENCY} {r_bal:,.2f}")
 
+            # === 页面展示：分类汇总 ===
             st.subheader(lang.T("cat_breakdown"))
-
-            # 报告页分类翻译修复
             cat_summary = rep_df.groupby(['category', 'type'])['amount'].sum().reset_index().sort_values('amount',
                                                                                                          ascending=False)
-
             st.dataframe(
                 cat_summary,
                 use_container_width=True,
@@ -402,6 +400,7 @@ with tab_report:
                 }
             )
 
+            # === 页面展示：明细 ===
             st.subheader(lang.T("tab_data"))
             st.dataframe(
                 rep_df,
@@ -417,13 +416,53 @@ with tab_report:
                 }
             )
 
-            clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
-            excel_data = backend.to_excel(clean_export_df)
+            # === 🔥 专业版导出逻辑 (Clean & Split) ===
+            st.subheader(lang.T("download_excel"))
+
+            # 1. 复制一份专门用于导出的数据
+            export_df = rep_df.copy()
+
+
+            # 2. 清洗 Emoji (去除非文字符号)
+            # 逻辑：如果是系统自带的带 Emoji 分类，我们通过 split 提取纯文本部分
+            # 例如 "🍔 Food" -> "Food", "🍔 餐饮" -> "餐饮"
+            # 假设格式总是 "Emoji + 空格 + 文本"，如果不是则保留原样(自定义分类)
+            def clean_emoji(val):
+                if isinstance(val, str) and " " in val:
+                    # 尝试分割，取空格后的部分
+                    parts = val.split(" ", 1)
+                    if len(parts) > 1:
+                        return parts[1]
+                return val
+
+
+            export_df['category'] = export_df['category'].apply(clean_emoji)
+
+            # 3. 收支分列 (Pivot / Split Columns)
+            # 创建 Income 和 Expense 列
+            export_df[lang.T('col_inc')] = export_df.apply(lambda x: x['amount'] if x['type'] == inc_k else 0, axis=1)
+            export_df[lang.T('col_exp')] = export_df.apply(lambda x: x['amount'] if x['type'] == exp_k else 0, axis=1)
+
+            # 4. 整理最终列 (日期, 分类, 收入, 支出, 备注)
+            # 注意：不再包含原来的 'type' 和 'amount' 列
+            final_cols = ['date', 'category', lang.T('col_inc'), lang.T('col_exp'), 'note']
+            export_df = export_df[final_cols]
+
+            # 5. 重命名列头为专业术语
+            export_df.columns = [
+                lang.T('col_date'),
+                lang.T('col_cat'),
+                lang.T('col_inc'),
+                lang.T('col_exp'),
+                lang.T('col_note')
+            ]
+
+            excel_data = backend.to_excel(export_df)
 
             st.download_button(
                 label=f"{lang.T('download_excel')}",
                 data=excel_data,
-                file_name=f'Report_{start_date}_{end_date}.xlsx',
+                file_name=f'Professional_Report_{start_date}_{end_date}.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 type='primary'
             )
