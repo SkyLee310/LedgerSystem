@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import backend
 import calendar
-from datetime import date, timedelta, datetime
+from datetime import date
 
 # === 1. 页面配置 ===
 st.set_page_config(
@@ -15,7 +15,7 @@ st.set_page_config(
 
 CURRENCY = "RM"
 
-# === 2. 核心 UI 样式优化 (CSS) - 修复布局版 ===
+# === 2. 核心 UI 样式优化 ===
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} 
@@ -42,19 +42,17 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* === 日历组件修复样式 === */
+    /* === 日历组件样式 === */
     .calendar-container {
         width: 100%;
         overflow-x: auto;
     }
     .cal-table {
         width: 100%;
-        table-layout: fixed; /* 强制列宽相等，防止挤压 */
+        table-layout: fixed;
         border-collapse: separate; 
-        border-spacing: 0; /* 用 padding 来控制间距 */
+        border-spacing: 0; 
     }
-
-    /* 表头样式 */
     .cal-th {
         text-align: center;
         padding: 10px 0;
@@ -62,38 +60,31 @@ st.markdown("""
         color: #a0a0a0;
         font-weight: 600;
         text-transform: uppercase;
-        width: 14.28%; /* 强制 1/7 宽度 */
+        width: 14.28%;
     }
-
-    /* 单元格容器 (保持默认 display: table-cell) */
     .cal-td {
-        padding: 4px; /* 这里控制格子之间的间距 */
+        padding: 4px;
         vertical-align: top;
         border: none !important;
         background: transparent !important;
     }
-
-    /* 真正的卡片 (放在 td 里面) */
     .cal-card {
         background-color: #2d2d3a;
         border-radius: 12px;
-        height: 95px; /* 固定高度 */
+        height: 95px;
         padding: 8px;
-        display: flex; /* Flex 放在这里是安全的 */
+        display: flex;
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         transition: all 0.2s ease;
     }
-
     .cal-card:hover {
         transform: translateY(-2px);
         background-color: #363645;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-
-    /* 颜色变体 */
     .cal-card.pos {
         background-color: #00C897;
         color: white;
@@ -104,30 +95,24 @@ st.markdown("""
         color: white;
         box-shadow: 0 4px 10px rgba(255, 92, 92, 0.3);
     }
-
-    /* 今天高亮 */
     .cal-card.today {
         border: 2px solid #FFD700;
     }
-
     .cal-day-num {
         font-size: 1rem;
         font-weight: 600;
-        align-self: flex-start; /* 数字靠左上角 */
+        align-self: flex-start;
     }
-
     .cal-val {
         font-size: 0.85rem;
         font-weight: bold;
-        align-self: flex-end; /* 金额靠右下角 */
+        align-self: flex-end;
     }
-
-    /* 手机适配：周视图高度 */
     .week-view .cal-card { height: 110px; }
     </style>
     """, unsafe_allow_html=True)
 
-# === 3. 语言包 ===
+# === 3. 语言包与映射 ===
 TRANS = {
     "app_title": {"CN": "我的账本", "EN": "My Ledger Pro"},
     "sidebar_title": {"CN": "📚 账本列表", "EN": "📚 Ledgers"},
@@ -160,6 +145,7 @@ TRANS = {
     "tab_del":{"CN":"删除记录","EN":"Delete Record"}
 }
 
+# 这里的 Key 是数据库里的中文，Value 是英文显示
 CAT_TRANS = {
     "餐饮": "🍔 Food", "交通": "🚗 Transport", "购物": "🛍️ Shopping",
     "居住": "🏠 Housing", "工资": "💰 Salary", "娱乐": "🎮 Fun",
@@ -173,6 +159,7 @@ def T(key):
 
 
 def get_cat_display(cat_name):
+    """单独显示分类时的翻译辅助"""
     lang = st.session_state.get('language_code', 'CN')
     if lang == 'EN': return CAT_TRANS.get(cat_name, cat_name)
     return cat_name
@@ -192,7 +179,15 @@ def save_callback():
     active_id = st.session_state.get('active_ledger_id')
 
     if active_id and amt > 0 and cat:
+        # 存入数据库时，统一转成标准的中文或英文（这里假设存中文逻辑不变，或者存当前界面语言）
+        # 为了兼容性，我们根据 type_opts 的选择来判断
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
+
+        # 如果是英文模式下选的 "Food"，我们需要存入数据库什么？
+        # 建议：数据库存什么就是什么。如果用户在英文界面存了 "Food"，那就存 "Food"。
+        # 但为了让旧数据 "餐饮" 和新数据 "Food" 混在一起能看，我们通常在读取时翻译。
+        # 这里为了简单，直接存。
+
         backend.save_record(active_id, dt, db_type, cat, amt, note)
         st.toast("✅ " + ("已保存!" if lang == 'CN' else "Saved Successfully!"))
     elif amt <= 0:
@@ -215,16 +210,19 @@ def del_cat_callback():
         st.toast(f"Tag removed: {del_c}")
 
 
-# === 5. 日历生成函数 (结构修复) ===
+# === 5. 日历生成函数 ===
 def render_calendar_html(year, month, df_data, mode='Month', selected_date=None):
     daily_net = {}
     if not df_data.empty:
+        # 此时 df_data 已经是翻译过的了，所以要判断 Income/Expense
         df_calc = df_data.copy()
+        # 兼容中文和英文的判断
         df_calc['calc_amount'] = df_calc.apply(
-            lambda x: x['amount'] if x['type'] in ['收入', 'Income'] else -x['amount'], axis=1)
+            lambda x: x['amount'] if x['type'] in ['收入', 'Income'] else -x['amount'], axis=1
+        )
         daily_net = df_calc.groupby('date')['calc_amount'].sum().to_dict()
 
-    cal = calendar.Calendar(firstweekday=6)  # Sunday start
+    cal = calendar.Calendar(firstweekday=6)
 
     if mode == 'Month':
         month_days = cal.monthdayscalendar(year, month)
@@ -252,20 +250,17 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
     html += '</tr></thead>'
 
     html += '<tbody class="week-view" >' if mode == 'Week' else '<tbody>'
-
     today_str = str(date.today())
 
     for week in month_days:
         html += '<tr>'
         for day in week:
             if day == 0:
-                # 空格子
                 html += '<td class="cal-td"></td>'
             else:
                 current_date_str = f"{year}-{month:02d}-{day:02d}"
                 val = daily_net.get(current_date_str, 0)
 
-                # 确定卡片样式 (而不是 td 样式)
                 card_class = "cal-card"
                 if val > 0:
                     card_class += " pos"
@@ -280,7 +275,6 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
                     prefix = "+" if val > 0 else ""
                     val_display = f'<span class="cal-val">{prefix}{val:,.0f}</span>'
 
-                # 关键修复：TD 保持原样，内部放一个 DIV 做卡片
                 html += '<td class="cal-td">'
                 html += f'<div class="{card_class}">'
                 html += f'<span class="cal-day-num">{day}</span>'
@@ -346,6 +340,7 @@ else:
     st.title(T("app_title"))
     st.stop()
 
+# 记账区
 with st.expander(T("header_entry"), expanded=True):
     c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])
     with c1: st.date_input(T("date"), date.today(), key='input_date')
@@ -354,13 +349,29 @@ with st.expander(T("header_entry"), expanded=True):
         st.selectbox(T("category"), type_opts, key='input_type', label_visibility="visible")
     with c3:
         current_cats = backend.get_categories(current_ledger_id)
+        # 记账时，下拉菜单也显示翻译后的
         st.selectbox(T("category"), current_cats, format_func=get_cat_display,
                      key=f'input_category_{st.session_state.get("language_code")}')
     with c4: st.number_input(T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
     st.text_input(T("note"), key='input_note', placeholder="e.g. Lunch with friends...")
     st.button(T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
+# === 核心逻辑：获取数据并根据语言进行“翻译” ===
 raw_df = backend.get_all_records(current_ledger_id)
+
+# 如果是英文模式，我们在此处对 DataFrame 进行“原地翻译”
+# 这样后续的表格、图表、日历都会自动使用英文
+if st.session_state.get('language_code') == 'EN' and not raw_df.empty:
+    # 1. 翻译类型 (Type)
+    type_mapping = {'收入': 'Income', '支出': 'Expense'}
+    raw_df['type'] = raw_df['type'].map(type_mapping).fillna(raw_df['type'])
+
+    # 2. 翻译分类 (Category) - 仅翻译系统预设的，自定义的保留原样
+    # map(CAT_TRANS) 会把匹配到的转英文，匹配不到的变成 NaN
+    # fillna(raw_df['category']) 会把 NaN 的地方填回原来的中文
+    raw_df['category'] = raw_df['category'].map(CAT_TRANS).fillna(raw_df['category'])
+
+# 选项卡
 tab_overview, tab_stats, tab_data = st.tabs([T("tab_overview"), T("tab_stats"), T("tab_data")])
 
 if raw_df.empty:
@@ -394,7 +405,7 @@ with tab_overview:
         fig_line.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
         st.plotly_chart(fig_line, use_container_width=True)
 
-# === Tab 2: 统计日历 (结构修复版) ===
+# === Tab 2: 统计日历 ===
 with tab_stats:
     cc1, cc2 = st.columns([1, 2])
     with cc1:
@@ -405,8 +416,7 @@ with tab_stats:
         pick_date = st.date_input(T("cal_date"), date.today())
 
     st.divider()
-
-    # 渲染日历
+    # 传入已经翻译过的 raw_df，所以日历不需要自己再翻译
     cal_html = render_calendar_html(pick_date.year, pick_date.month, raw_df, mode=mode_code, selected_date=pick_date)
     st.markdown(cal_html, unsafe_allow_html=True)
 
@@ -414,10 +424,6 @@ with tab_stats:
     st.subheader("📈 " + T("tab_stats"))
 
     df_viz = raw_df.copy()
-    if st.session_state.get('language_code') == 'EN':
-        df_viz['type'] = df_viz['type'].replace({'收入': 'Income', '支出': 'Expense'})
-        df_viz['category'] = df_viz['category'].map(CAT_TRANS).fillna(df_viz['category'])
-
     df_viz['month'] = pd.to_datetime(df_viz['date']).dt.to_period('M').astype(str)
     monthly_stats = df_viz.groupby(['month', 'type'])['amount'].sum().reset_index()
 
@@ -428,12 +434,17 @@ with tab_stats:
     fig_bar.update_layout(xaxis_title="", yaxis_title="", margin=dict(t=10, b=0, l=0, r=0))
     st.plotly_chart(fig_bar, use_container_width=True)
 
-# === Tab 3: 明细 ===
+# === Tab 3: 明细与筛选 ===
 with tab_data:
     with st.expander(T("filter_label"), expanded=False):
         f1, f2 = st.columns(2)
-        sel_cats = f1.multiselect(T("filter_cat"), backend.get_categories(current_ledger_id),
-                                  format_func=get_cat_display)
+
+        # 修复：筛选框的选项也必须是翻译过的
+        # 直接从 dataframe 获取当前存在的分类，而不是从 backend 拿原始分类
+        # 这样能保证筛选框里的选项和表格里的内容一致（都是英文或都是中文）
+        available_cats = raw_df['category'].unique().tolist()
+        sel_cats = f1.multiselect(T("filter_cat"), available_cats)
+
         type_opts = [T("all")] + (
             ["Expense", "Income"] if st.session_state.get('language_code') == 'EN' else ["支出", "收入"])
         sel_type = f2.selectbox(T("filter_type"), type_opts)
