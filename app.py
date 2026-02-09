@@ -252,11 +252,34 @@ with tab_overview:
     exp = raw_df[raw_df['type'].isin(['支出', 'Expense'])]['amount'].sum()
     bal = inc - exp
 
-    # 2. 显示漂亮的指标卡片
+    # === 修复版：强制颜色 ===
     col1, col2, col3 = st.columns(3)
-    col1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}", delta="Income")
-    col2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}", delta="-Expense", delta_color="inverse")
-    col3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}", delta="Net Worth", delta_color="off")
+
+    # 收入 (Income)：绿色
+    col1.metric(
+        T("total_income"),
+        f"{CURRENCY} {inc:,.2f}",
+        delta="Income",
+        delta_color="normal"  # 正常模式：默认绿色（如果 delta 没被解析为负数）
+    )
+
+    # 支出 (Expense)：红色
+    # 技巧：我们将 delta 设置为负值字符串，Streamlit 会将其渲染为红色
+    col2.metric(
+        T("total_expense"),
+        f"{CURRENCY} {exp:,.2f}",
+        delta=f"-{exp:,.2f}",  # 重点：前面加个负号，让它变红
+        delta_color="normal"  # 正常模式下，负数就是红色
+    )
+
+    # 结余 (Balance)：动态颜色
+    # 如果结余 > 0 绿色，< 0 红色
+    col3.metric(
+        T("balance"),
+        f"{CURRENCY} {bal:,.2f}",
+        delta=f"{bal:,.2f}",
+        delta_color="normal"
+    )
 
     st.divider()
 
