@@ -387,7 +387,23 @@ with tab_data:
         target_type = sel_type  # 比如 "Expense" 或 "支出"
         df_show = df_show[df_show['type'] == target_type]
 
-    st.dataframe(df_show, use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_show,
+        use_container_width=True,
+        hide_index=True,
+        # 1. 关键修改：在 column_order 中删掉 "id" 和 "ledger_id"
+        # 只保留你想让用户看到的列
+        column_order=("date", "type", "category", "amount", "note"),
+
+        column_config={
+            # 2. "id" 的配置可以删掉了，因为上面已经不显示它了
+            "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
+            "type": st.column_config.TextColumn(T("type"), width="small"),
+            "category": st.column_config.TextColumn(T("category"), width="medium"),
+            "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f", step=0.01),
+            "note": st.column_config.TextColumn(T("note"), width="large"),
+        }
+    )
 
     c_del1, c_del2 = st.columns([3, 1])
     with c_del1:
@@ -461,7 +477,23 @@ with tab_report:
             st.subheader(T("cat_breakdown"))
             cat_summary = rep_df.groupby(['category', 'type'])['amount'].sum().reset_index().sort_values('amount',
                                                                                                          ascending=False)
-            st.dataframe(cat_summary, use_container_width=True)
+            st.dataframe(
+                df_show,
+                use_container_width=True,
+                hide_index=True,
+                # 1. 关键修改：在 column_order 中删掉 "id" 和 "ledger_id"
+                # 只保留你想让用户看到的列
+                column_order=("date", "type", "category", "amount", "note"),
+
+                column_config={
+                    # 2. "id" 的配置可以删掉了，因为上面已经不显示它了
+                    "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
+                    "type": st.column_config.TextColumn(T("type"), width="small"),
+                    "category": st.column_config.TextColumn(T("category"), width="medium"),
+                    "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f", step=0.01),
+                    "note": st.column_config.TextColumn(T("note"), width="large"),
+                }
+            )
 
             # C. 导出按钮
             excel_data = backend.to_excel(rep_df)
