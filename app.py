@@ -133,7 +133,7 @@ def save_callback():
 
     if active_id and amt > 0 and cat:
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
-        backend.add_record(active_id, dt, db_type, cat, amt, note)
+        backend.save_record(active_id, dt, db_type, cat, amt, note)
         st.success("Saved!")
     elif amt <= 0:
         st.error("Amount must be > 0")
