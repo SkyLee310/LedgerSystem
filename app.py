@@ -227,12 +227,14 @@ if not raw_df.empty:
 
         # 2. Category 翻译
         raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS)
+
     else:
-        # CN 模式
+
         type_map_cn = {'Income': '收入', 'Expense': '支出', '收入': '收入', '支出': '支出'}
         raw_df['type'] = raw_df['type'].map(type_map_cn).fillna(raw_df['type'])
 
         raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS_REV)
+        raw_df['category'] = raw_df['category'].replace(lang.CAT_CN_EMOJI)
 
 # 选项卡
 tab_overview, tab_stats, tab_data, tab_report = st.tabs(

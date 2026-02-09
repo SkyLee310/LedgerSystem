@@ -35,7 +35,7 @@ TRANS = {
     "view_month": {"CN": "月视图", "EN": "Month"},
     "view_week": {"CN": "周视图", "EN": "Week"},
     "cal_date": {"CN": "选择日期", "EN": "Select Date"},
-    "tab_del":{"CN":"删除记录","EN":"Delete Record"},
+    "tab_del": {"CN": "删除记录", "EN": "Delete Record"},
 
     "report_type": {"CN": "报告类型", "EN": "Report Type"},
     "rep_weekly": {"CN": "周报 (Weekly)", "EN": "Weekly"},
@@ -50,6 +50,7 @@ TRANS = {
     "download_excel": {"CN": "📥 导出 Excel 报告", "EN": "📥 Download Excel Report"}
 }
 
+# 1. 中文(纯文本) -> 英文(Emoji)
 CAT_TRANS = {
     "餐饮": "🍔 Food",
     "交通": "🚗 Transport",
@@ -61,15 +62,30 @@ CAT_TRANS = {
     "其他": "📦 Others"
 }
 
-CAT_TRANS_REV = {v: k for k, v in CAT_TRANS.items()}
+# 2. 🔥 新增：中文(纯文本) -> 中文(Emoji)
+# 这样中文模式下也能显示 Emoji 了！
+CAT_CN_EMOJI = {
+    "餐饮": "🍔 餐饮",
+    "交通": "🚗 交通",
+    "购物": "🛍️ 购物",
+    "居住": "🏠 居住",
+    "工资": "💰 工资",
+    "娱乐": "🎮 娱乐",
+    "医疗": "💊 医疗",
+    "其他": "📦 其他"
+}
 
+# 反向映射：英文 -> 中文纯文本
+CAT_TRANS_REV = {v: k for k, v in CAT_TRANS.items()}
 
 def T(key):
     lang = st.session_state.get('language_code', 'EN')
     return TRANS.get(key, {}).get(lang, key)
 
-
 def get_cat_display(cat_name):
     lang = st.session_state.get('language_code', 'CN')
-    if lang == 'EN': return CAT_TRANS.get(cat_name, cat_name)
-    return cat_name
+    if lang == 'EN':
+        return CAT_TRANS.get(cat_name, cat_name)
+    else:
+        # 🔥 修改这里：如果是中文，去查那个新的中文Emoji字典
+        return CAT_CN_EMOJI.get(cat_name, cat_name)
