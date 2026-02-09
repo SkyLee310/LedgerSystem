@@ -15,7 +15,7 @@ st.set_page_config(
 
 CURRENCY = "RM"
 
-# === 2. 核心 UI 样式优化 (CSS) ===
+# === 2. 核心 UI 样式优化 (CSS) - 深度美化版 ===
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} 
@@ -27,13 +27,13 @@ st.markdown("""
         background-color: #262730; 
         border: 1px solid #464b5c; 
         padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        border-radius: 16px; /* 更大的圆角 */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         transition: transform 0.2s;
     }
     div[data-testid="stMetric"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.5);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
         border-color: #808495;
     }
 
@@ -42,58 +42,90 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* === 日历组件样式 === */
+    /* === 日历组件美化样式 (复刻参考图) === */
     .calendar-container {
         width: 100%;
-        overflow-x: auto; /* 手机端支持横向滚动 */
+        overflow-x: auto;
+        padding: 10px 0; /* 给阴影留空间 */
     }
     .cal-table {
         width: 100%;
-        border-collapse: separate;
-        border-spacing: 4px;
-        color: inherit;
+        border-collapse: separate; /* 必须分离边框才能实现圆角和间距 */
+        border-spacing: 8px; /* 格子之间的间距 */
+        color: #e0e0e0;
     }
     .cal-th {
         text-align: center;
-        padding: 8px;
-        font-size: 0.9rem;
-        color: #888;
+        padding: 12px 0;
+        font-size: 0.85rem;
+        color: #a0a0a0;
         font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 1px;
     }
+    /* 基础格子样式 */
     .cal-td {
-        border: 1px solid #333;
-        border-radius: 8px;
-        padding: 8px;
+        border: none;
+        border-radius: 18px; /* 参考图的大圆角 */
+        padding: 10px 8px;
         vertical-align: top;
-        height: 90px; /* 格子高度 */
-        min-width: 70px; /* 最小宽度，防止手机上太挤 */
-        background-color: #1e1e1e;
+        height: 95px;
+        min-width: 75px;
+        background-color: #2d2d3a; /* 默认深色背景 */
         position: relative;
-        transition: 0.2s;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
     }
     .cal-td:hover {
-        background-color: #2d2d2d;
-        border-color: #555;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        background-color: #363645;
     }
-    .cal-day-num {
-        font-size: 0.8rem;
-        color: #aaa;
-        margin-bottom: 4px;
-        display: block;
+    /* 净收入 (绿色) 格子 */
+    .cal-td.pos {
+        background-color: #00C897 !important; /* 鲜艳的绿色背景 */
+        color: #ffffff !important;
+        box-shadow: 0 4px 10px rgba(0, 200, 151, 0.3);
     }
-    .cal-val {
-        font-size: 0.9rem;
-        font-weight: bold;
-        display: block;
-        margin-top: 10px;
+    /* 净支出 (红色) 格子 */
+    .cal-td.neg {
+        background-color: #FF5C5C !important; /* 柔和的红色背景 */
+        color: #ffffff !important;
+        box-shadow: 0 4px 10px rgba(255, 92, 92, 0.3);
     }
-    .val-pos { color: #00CC96; } /* 绿色 */
-    .val-neg { color: #EF553B; } /* 红色 */
-    .cal-empty { background: transparent; border: none; }
+    /* 今天高亮 (用边框区分) */
+    .cal-td.today {
+        border: 2px solid #FFD700; /* 金色边框 */
+    }
 
-    /* 周视图特殊调整 */
-    .week-view .cal-td { height: 120px; }
+    /* 日期数字 */
+    .cal-day-num {
+        font-size: 1rem;
+        font-weight: 600;
+        color: inherit; /* 跟随父级颜色 */
+        margin-bottom: 4px;
+    }
+    /* 金额数字 */
+    .cal-val {
+        font-size: 0.85rem;
+        font-weight: bold;
+        color: inherit; /* 跟随父级颜色 */
+        white-space: nowrap;
+    }
+    /* 在有色背景下，金额显示得更清楚 */
+    .pos .cal-val, .neg .cal-val {
+        font-size: 0.9rem;
+        opacity: 0.95;
+    }
+
+    .cal-empty { background: transparent; box-shadow: none; }
+
+    /* 周视图高度调整 */
+    .week-view .cal-td { height: 110px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,7 +144,7 @@ TRANS = {
     "note": {"CN": "备注", "EN": "Note"},
     "btn_save": {"CN": "💾 立即保存", "EN": "💾 Save Record"},
     "tab_overview": {"CN": "📊 概览", "EN": "📊 Dashboard"},
-    "tab_stats": {"CN": "📅 统计日历", "EN": "📅 Calendar & Stats"},  # 修改了这里
+    "tab_stats": {"CN": "📅 统计日历", "EN": "📅 Calendar & Stats"},
     "tab_data": {"CN": "📋 明细", "EN": "📋 Records"},
     "filter_label": {"CN": "🔍 筛选与搜索", "EN": "🔍 Filter & Search"},
     "filter_cat": {"CN": "按分类", "EN": "By Category"},
@@ -123,8 +155,6 @@ TRANS = {
     "manage_cats": {"CN": "分类管理", "EN": "Categories"},
     "welcome": {"CN": "欢迎回来！", "EN": "Welcome Back!"},
     "empty": {"CN": "暂无数据，快去记一笔吧！", "EN": "No records yet. Add one now!"},
-
-    # 日历相关
     "cal_view": {"CN": "视图模式", "EN": "View Mode"},
     "view_month": {"CN": "月视图", "EN": "Month"},
     "view_week": {"CN": "周视图", "EN": "Week"},
@@ -186,56 +216,45 @@ def del_cat_callback():
         st.toast(f"Tag removed: {del_c}")
 
 
-# === 5. 日历生成函数 (核心逻辑) ===
+# === 5. 日历生成函数 (逻辑更新) ===
 def render_calendar_html(year, month, df_data, mode='Month', selected_date=None):
-    # 1. 准备数据字典 { '2023-10-01': 100.50 }
     daily_net = {}
     if not df_data.empty:
-        # 转换金额：收入为正，支出为负
         df_calc = df_data.copy()
         df_calc['calc_amount'] = df_calc.apply(
             lambda x: x['amount'] if x['type'] in ['收入', 'Income'] else -x['amount'], axis=1)
         daily_net = df_calc.groupby('date')['calc_amount'].sum().to_dict()
 
-    # 2. 生成日历网格
-    cal = calendar.Calendar(firstweekday=6)  # 0=Mon, 6=Sun
+    cal = calendar.Calendar(firstweekday=6)
 
     if mode == 'Month':
         month_days = cal.monthdayscalendar(year, month)
-    else:  # Week Mode
-        # 找到选中日期所在的那一周
+    else:
         sel_dt = pd.to_datetime(selected_date).date()
         all_weeks = cal.monthdayscalendar(year, month)
         target_week = []
-
-        # 简单的查找逻辑：先尝试在当月找
         found = False
         for week in all_weeks:
             if sel_dt.day in week and week[week.index(sel_dt.day)] != 0:
                 target_week = week
                 found = True
                 break
-
-        # 如果是跨月周（例如选中了上个月的最后几天显示在当前月视图里），这里简化处理：
-        # 实际上 monthdayscalendar 会返回 0，所以我们重新构建一个周列表
         if not found:
-            # 如果没在当前月找到（理论上 selected_date 传进来就是 year/month），这里做一个容错
             month_days = all_weeks
         else:
             month_days = [target_week]
 
-    # 3. 构建 HTML
     week_days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     html = '<div class="calendar-container"><table class="cal-table">'
 
-    # 表头
     html += '<thead><tr>'
     for w in week_days:
         html += f'<th class="cal-th">{w}</th>'
     html += '</tr></thead>'
 
-    # 表体
     html += '<tbody class="week-view" >' if mode == 'Week' else '<tbody>'
+
+    today_str = str(date.today())
 
     for week in month_days:
         html += '<tr>'
@@ -243,22 +262,29 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
             if day == 0:
                 html += '<td class="cal-td cal-empty"></td>'
             else:
-                # 构建日期字符串 YYYY-MM-DD
                 current_date_str = f"{year}-{month:02d}-{day:02d}"
                 val = daily_net.get(current_date_str, 0)
 
-                # 颜色逻辑
-                val_class = "val-pos" if val >= 0 else "val-neg"
+                # 核心改动：根据正负值给 TD 加类名，而不是给 span 加
+                td_class = "cal-td"
+                if val > 0:
+                    td_class += " pos"
+                elif val < 0:
+                    td_class += " neg"
+
+                if current_date_str == today_str:
+                    td_class += " today"
+
                 val_display = ""
                 if val != 0:
-                    val_display = f'<span class="cal-val {val_class}">{CURRENCY} {val:,.0f}</span>'
+                    # 显示 + 号和 k 单位 (可选，这里先保持完整数字)
+                    prefix = "+" if val > 0 else ""
+                    val_display = f'<span class="cal-val">{prefix}{val:,.0f}</span>'
 
-                # 今天的日期高亮 (可选)
-                bg_style = 'style="border: 2px solid #00CC96;"' if current_date_str == str(date.today()) else ""
-
-                html += f'<td class="cal-td" {bg_style}>'
-                html += f'<span class="cal-day-num">{day}</span>'
-                html += val_display
+                html += f'<td class="{td_class}">'
+                # 使用 div 来辅助垂直居中和布局
+                html += f'<div><span class="cal-day-num">{day}</span></div>'
+                html += f'<div>{val_display}</div>'
                 html += '</td>'
         html += '</tr>'
 
@@ -319,7 +345,6 @@ else:
     st.title(T("app_title"))
     st.stop()
 
-# 记账区
 with st.expander(T("header_entry"), expanded=True):
     c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])
     with c1: st.date_input(T("date"), date.today(), key='input_date')
@@ -368,31 +393,25 @@ with tab_overview:
         fig_line.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
         st.plotly_chart(fig_line, use_container_width=True)
 
-# === Tab 2: 统计日历 (NEW) ===
+# === Tab 2: 统计日历 (美化版) ===
 with tab_stats:
-    # 1. 控制栏
     cc1, cc2 = st.columns([1, 2])
     with cc1:
-        # 视图切换：月 / 周
         v_mode_label = [T("view_month"), T("view_week")]
         v_mode_sel = st.radio(T("cal_view"), v_mode_label, horizontal=True)
-        # 映射回代码逻辑需要的 'Month' / 'Week'
         mode_code = 'Month' if v_mode_sel == T("view_month") else 'Week'
     with cc2:
-        # 日期选择器
         pick_date = st.date_input(T("cal_date"), date.today())
 
     st.divider()
 
-    # 2. 生成并显示日历
-    # 提取选中的年和月
+    # 渲染美化后的日历
     cal_html = render_calendar_html(pick_date.year, pick_date.month, raw_df, mode=mode_code, selected_date=pick_date)
     st.markdown(cal_html, unsafe_allow_html=True)
 
     st.divider()
-    st.subheader("📈 " + T("tab_stats"))  # 原有的图表放在下面
+    st.subheader("📈 " + T("tab_stats"))
 
-    # 原有的柱状图逻辑...
     df_viz = raw_df.copy()
     if st.session_state.get('language_code') == 'EN':
         df_viz['type'] = df_viz['type'].replace({'收入': 'Income', '支出': 'Expense'})
