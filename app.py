@@ -180,7 +180,7 @@ with st.sidebar:
     if selected_ledger_name:
         with st.expander(lang.T("manage_cats")):
             current_categories = backend.get_categories(current_ledger_id)
-            c1, c2 = st.tabs(["➕", "➖"])
+            c1, c2 = st.tabs([lang.T("tab_add_cat"), lang.T("tab_del_cat")])
             with c1:
                 st.text_input("New", key='new_cat_input', label_visibility="collapsed")
                 st.button("Add", on_click=add_cat_callback, use_container_width=True)
