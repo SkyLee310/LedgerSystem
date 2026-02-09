@@ -109,7 +109,7 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
                 target_week = week
                 break
         if not target_week:
-            month_days = cal.monthdayscalendar(year, month)  # Fallback
+            month_days = cal.monthdayscalendar(year, month)
         else:
             month_days = [target_week]
 
@@ -210,27 +210,28 @@ with st.expander(lang.T("header_entry"), expanded=True):
     st.button(lang.T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
 # =========================================================
-# 🔥 修复：增强版全局数据翻译 (使用 replace 代替 map)
+# 🔥 修复：增强版全局数据翻译
 # =========================================================
 raw_df = backend.get_all_records(current_ledger_id)
 
 if not raw_df.empty:
     current_lang = st.session_state.get('language_code', 'CN')
 
-    # 0. 清洗数据：去除可能存在的首尾空格，确保匹配成功
+    # 0. 清洗数据
     raw_df['category'] = raw_df['category'].astype(str).str.strip()
 
     if current_lang == 'EN':
-        # 1. Type 翻译
-        raw_df['type'] = raw_df['type'].replace(['支出', 'Expense'], 'Expense')
-        raw_df['type'] = raw_df['type'].replace(['收入', 'Income'], 'Income')
+        # 1. Type 翻译 (使用 Mapping 更稳健)
+        type_map_en = {'收入': 'Income', '支出': 'Expense', 'Income': 'Income', 'Expense': 'Expense'}
+        raw_df['type'] = raw_df['type'].map(type_map_en).fillna(raw_df['type'])
 
-        # 2. Category 翻译 (使用 replace，没找到的保留原样)
+        # 2. Category 翻译
         raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS)
     else:
         # CN 模式
-        raw_df['type'] = raw_df['type'].replace(['Expense', '支出'], '支出')
-        raw_df['type'] = raw_df['type'].replace(['Income', '收入'], '收入')
+        type_map_cn = {'Income': '收入', 'Expense': '支出', '收入': '收入', '支出': '支出'}
+        raw_df['type'] = raw_df['type'].map(type_map_cn).fillna(raw_df['type'])
+
         raw_df['category'] = raw_df['category'].replace(lang.CAT_TRANS_REV)
 
 # 选项卡
@@ -241,7 +242,7 @@ if raw_df.empty:
     st.info(lang.T("empty"))
     st.stop()
 
-# === Tab 1: 概览 (修复饼图) ===
+# === Tab 1: 概览 ===
 with tab_overview:
     inc_key = '收入' if current_lang == 'CN' else 'Income'
     exp_key = '支出' if current_lang == 'CN' else 'Expense'
@@ -363,7 +364,7 @@ with tab_report:
 
     if start_date and end_date:
         mask = (pd.to_datetime(raw_df['date']).dt.date >= start_date) & (
-                    pd.to_datetime(raw_df['date']).dt.date <= end_date)
+                pd.to_datetime(raw_df['date']).dt.date <= end_date)
         rep_df = raw_df[mask].copy()
 
         st.divider()
