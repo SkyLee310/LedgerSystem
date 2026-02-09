@@ -15,7 +15,7 @@ st.set_page_config(
 
 CURRENCY = "RM"
 
-# === 2. 核心 UI 样式优化 (CSS) - 深度美化版 ===
+# === 2. 核心 UI 样式优化 (CSS) - 修复布局版 ===
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} 
@@ -27,7 +27,7 @@ st.markdown("""
         background-color: #262730; 
         border: 1px solid #464b5c; 
         padding: 15px 20px;
-        border-radius: 16px; /* 更大的圆角 */
+        border-radius: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         transition: transform 0.2s;
     }
@@ -42,90 +42,88 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* === 日历组件美化样式 (复刻参考图) === */
+    /* === 日历组件修复样式 === */
     .calendar-container {
         width: 100%;
         overflow-x: auto;
-        padding: 10px 0; /* 给阴影留空间 */
     }
     .cal-table {
         width: 100%;
-        border-collapse: separate; /* 必须分离边框才能实现圆角和间距 */
-        border-spacing: 8px; /* 格子之间的间距 */
-        color: #e0e0e0;
+        table-layout: fixed; /* 强制列宽相等，防止挤压 */
+        border-collapse: separate; 
+        border-spacing: 0; /* 用 padding 来控制间距 */
     }
+
+    /* 表头样式 */
     .cal-th {
         text-align: center;
-        padding: 12px 0;
+        padding: 10px 0;
         font-size: 0.85rem;
         color: #a0a0a0;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        width: 14.28%; /* 强制 1/7 宽度 */
     }
-    /* 基础格子样式 */
+
+    /* 单元格容器 (保持默认 display: table-cell) */
     .cal-td {
-        border: none;
-        border-radius: 18px; /* 参考图的大圆角 */
-        padding: 10px 8px;
+        padding: 4px; /* 这里控制格子之间的间距 */
         vertical-align: top;
-        height: 95px;
-        min-width: 75px;
-        background-color: #2d2d3a; /* 默认深色背景 */
-        position: relative;
-        transition: all 0.2s ease-in-out;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        display: flex;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    /* 真正的卡片 (放在 td 里面) */
+    .cal-card {
+        background-color: #2d2d3a;
+        border-radius: 12px;
+        height: 95px; /* 固定高度 */
+        padding: 8px;
+        display: flex; /* Flex 放在这里是安全的 */
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
-    }
-    .cal-td:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        background-color: #363645;
-    }
-    /* 净收入 (绿色) 格子 */
-    .cal-td.pos {
-        background-color: #00C897 !important; /* 鲜艳的绿色背景 */
-        color: #ffffff !important;
-        box-shadow: 0 4px 10px rgba(0, 200, 151, 0.3);
-    }
-    /* 净支出 (红色) 格子 */
-    .cal-td.neg {
-        background-color: #FF5C5C !important; /* 柔和的红色背景 */
-        color: #ffffff !important;
-        box-shadow: 0 4px 10px rgba(255, 92, 92, 0.3);
-    }
-    /* 今天高亮 (用边框区分) */
-    .cal-td.today {
-        border: 2px solid #FFD700; /* 金色边框 */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
     }
 
-    /* 日期数字 */
+    .cal-card:hover {
+        transform: translateY(-2px);
+        background-color: #363645;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* 颜色变体 */
+    .cal-card.pos {
+        background-color: #00C897;
+        color: white;
+        box-shadow: 0 4px 10px rgba(0, 200, 151, 0.3);
+    }
+    .cal-card.neg {
+        background-color: #FF5C5C;
+        color: white;
+        box-shadow: 0 4px 10px rgba(255, 92, 92, 0.3);
+    }
+
+    /* 今天高亮 */
+    .cal-card.today {
+        border: 2px solid #FFD700;
+    }
+
     .cal-day-num {
         font-size: 1rem;
         font-weight: 600;
-        color: inherit; /* 跟随父级颜色 */
-        margin-bottom: 4px;
+        align-self: flex-start; /* 数字靠左上角 */
     }
-    /* 金额数字 */
+
     .cal-val {
         font-size: 0.85rem;
         font-weight: bold;
-        color: inherit; /* 跟随父级颜色 */
-        white-space: nowrap;
-    }
-    /* 在有色背景下，金额显示得更清楚 */
-    .pos .cal-val, .neg .cal-val {
-        font-size: 0.9rem;
-        opacity: 0.95;
+        align-self: flex-end; /* 金额靠右下角 */
     }
 
-    .cal-empty { background: transparent; box-shadow: none; }
-
-    /* 周视图高度调整 */
-    .week-view .cal-td { height: 110px; }
+    /* 手机适配：周视图高度 */
+    .week-view .cal-card { height: 110px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -216,7 +214,7 @@ def del_cat_callback():
         st.toast(f"Tag removed: {del_c}")
 
 
-# === 5. 日历生成函数 (逻辑更新) ===
+# === 5. 日历生成函数 (结构修复) ===
 def render_calendar_html(year, month, df_data, mode='Month', selected_date=None):
     daily_net = {}
     if not df_data.empty:
@@ -225,7 +223,7 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
             lambda x: x['amount'] if x['type'] in ['收入', 'Income'] else -x['amount'], axis=1)
         daily_net = df_calc.groupby('date')['calc_amount'].sum().to_dict()
 
-    cal = calendar.Calendar(firstweekday=6)
+    cal = calendar.Calendar(firstweekday=6)  # Sunday start
 
     if mode == 'Month':
         month_days = cal.monthdayscalendar(year, month)
@@ -260,31 +258,33 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
         html += '<tr>'
         for day in week:
             if day == 0:
-                html += '<td class="cal-td cal-empty"></td>'
+                # 空格子
+                html += '<td class="cal-td"></td>'
             else:
                 current_date_str = f"{year}-{month:02d}-{day:02d}"
                 val = daily_net.get(current_date_str, 0)
 
-                # 核心改动：根据正负值给 TD 加类名，而不是给 span 加
-                td_class = "cal-td"
+                # 确定卡片样式 (而不是 td 样式)
+                card_class = "cal-card"
                 if val > 0:
-                    td_class += " pos"
+                    card_class += " pos"
                 elif val < 0:
-                    td_class += " neg"
+                    card_class += " neg"
 
                 if current_date_str == today_str:
-                    td_class += " today"
+                    card_class += " today"
 
                 val_display = ""
                 if val != 0:
-                    # 显示 + 号和 k 单位 (可选，这里先保持完整数字)
                     prefix = "+" if val > 0 else ""
                     val_display = f'<span class="cal-val">{prefix}{val:,.0f}</span>'
 
-                html += f'<td class="{td_class}">'
-                # 使用 div 来辅助垂直居中和布局
-                html += f'<div><span class="cal-day-num">{day}</span></div>'
-                html += f'<div>{val_display}</div>'
+                # 关键修复：TD 保持原样，内部放一个 DIV 做卡片
+                html += '<td class="cal-td">'
+                html += f'<div class="{card_class}">'
+                html += f'<span class="cal-day-num">{day}</span>'
+                html += val_display
+                html += '</div>'
                 html += '</td>'
         html += '</tr>'
 
@@ -393,7 +393,7 @@ with tab_overview:
         fig_line.update_layout(margin=dict(t=0, b=0, l=0, r=0), yaxis_title=None, xaxis_title=None)
         st.plotly_chart(fig_line, use_container_width=True)
 
-# === Tab 2: 统计日历 (美化版) ===
+# === Tab 2: 统计日历 (结构修复版) ===
 with tab_stats:
     cc1, cc2 = st.columns([1, 2])
     with cc1:
@@ -405,7 +405,7 @@ with tab_stats:
 
     st.divider()
 
-    # 渲染美化后的日历
+    # 渲染日历
     cal_html = render_calendar_html(pick_date.year, pick_date.month, raw_df, mode=mode_code, selected_date=pick_date)
     st.markdown(cal_html, unsafe_allow_html=True)
 
