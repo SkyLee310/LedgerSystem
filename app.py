@@ -408,7 +408,7 @@ with tab_data:
                 backend.delete_record(del_opts[sel_rec_label])
                 st.rerun()
 
-# === Tab 4: 财务报告 ===
+# === Tab 4: 财务报告 (优化版：隐藏 ID + 格式化) ===
 with tab_report:
     st.subheader(T("report_type"))
     report_mode = st.radio("Mode", [T("rep_weekly"), T("rep_monthly"), T("rep_yearly")], horizontal=True,
@@ -437,6 +437,7 @@ with tab_report:
             filter_desc = f"Year: {sel_year}"
 
     if start_date and end_date:
+        # 筛选数据
         mask = (pd.to_datetime(raw_df['date']).dt.date >= start_date) & (
                     pd.to_datetime(raw_df['date']).dt.date <= end_date)
         rep_df = raw_df[mask].copy()
@@ -452,18 +453,53 @@ with tab_report:
             r_exp = rep_df[rep_df['type'] == exp_k]['amount'].sum()
             r_bal = r_inc - r_exp
 
+            # 1. 汇总卡片
             rc1, rc2, rc3 = st.columns(3)
             rc1.metric(T("total_income"), f"{CURRENCY} {r_inc:,.2f}")
             rc2.metric(T("total_expense"), f"{CURRENCY} {r_exp:,.2f}")
             rc3.metric(T("balance"), f"{CURRENCY} {r_bal:,.2f}")
 
+            # 2. 分类详情表 (美化版)
             st.subheader(T("cat_breakdown"))
             cat_summary = rep_df.groupby(['category', 'type'])['amount'].sum().reset_index().sort_values('amount',
                                                                                                          ascending=False)
-            st.dataframe(cat_summary, use_container_width=True)
 
+            st.dataframe(
+                cat_summary,
+                use_container_width=True,
+                hide_index=True,
+                # 显式配置列名翻译
+                column_config={
+                    "category": st.column_config.TextColumn(T("category")),
+                    "type": st.column_config.TextColumn(T("type")),
+                    "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f")
+                }
+            )
+
+            # 3. 期间明细表 (新增！应用隐藏 ID 逻辑)
+            st.subheader(T("tab_data"))  # 显示 "明细" 标题
+            st.dataframe(
+                rep_df,
+                use_container_width=True,
+                hide_index=True,
+                # 关键：这里控制显示的列，把 id 排除掉
+                column_order=("date", "type", "category", "amount", "note"),
+                column_config={
+                    "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
+                    "type": st.column_config.TextColumn(T("type")),
+                    "category": st.column_config.TextColumn(T("category")),
+                    "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f"),
+                    "note": st.column_config.TextColumn(T("note"))
+                }
+            )
+
+            # 4. Excel 导出 (净化版)
             st.subheader(T("download_excel"))
-            excel_data = backend.to_excel(rep_df)
+
+            # 关键：导出前把 ID 列去掉，只保留用户关心的列
+            clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
+            excel_data = backend.to_excel(clean_export_df)
+
             st.download_button(
                 label=f"📥 {T('download_excel')}",
                 data=excel_data,
