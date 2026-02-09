@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import backend
+import lang_pack as lang
 import calendar
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta
 
 # === 1. 页面配置 ===
 st.set_page_config(
@@ -14,6 +15,7 @@ st.set_page_config(
 )
 
 CURRENCY = "RM"
+COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Expense": "#EF553B"}
 
 # === 2. 核心 UI 样式 ===
 st.markdown("""
@@ -58,85 +60,12 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# === 3. 语言包与映射 ===
-TRANS = {
-    "app_title": {"CN": "我的账本", "EN": "My Ledger Pro"},
-    "sidebar_title": {"CN": "📚 账本列表", "EN": "📚 Ledgers"},
-    "current_ledger": {"CN": "当前账本", "EN": "Current Ledger"},
-    "total_income": {"CN": "总收入", "EN": "Total Income"},
-    "total_expense": {"CN": "总支出", "EN": "Total Expense"},
-    "balance": {"CN": "结余", "EN": "Net Balance"},
-    "header_entry": {"CN": "✨ 记一笔", "EN": "✨ New Transaction"},
 
-    # --- 表格表头翻译 (这里之前漏了 type) ---
-    "date": {"CN": "日期", "EN": "Date"},
-    "type": {"CN": "类型", "EN": "Type"},  # 👈 补上了这个！
-    "category": {"CN": "分类", "EN": "Category"},
-    "amount": {"CN": "金额", "EN": "Amount"},
-    "note": {"CN": "备注", "EN": "Note"},
-
-    "btn_save": {"CN": "💾 立即保存", "EN": "💾 Save Record"},
-
-    "tab_overview": {"CN": "📊 概览", "EN": "📊 Dashboard"},
-    "tab_stats": {"CN": "📅 统计日历", "EN": "📅 Calendar"},
-    "tab_data": {"CN": "📋 明细", "EN": "📋 Records"},
-    "tab_report": {"CN": "📑 财务报告", "EN": "📑 Reports"},
-
-    "filter_label": {"CN": "🔍 筛选与搜索", "EN": "🔍 Filter & Search"},
-    "filter_cat": {"CN": "按分类", "EN": "By Category"},
-    "filter_type": {"CN": "按类型", "EN": "By Type"},
-    "all": {"CN": "全部", "EN": "All"},
-    "settings": {"CN": "⚙️ 设置", "EN": "⚙️ Settings"},
-    "create_ledger": {"CN": "创建新账本", "EN": "Create Ledger"},
-    "manage_cats": {"CN": "分类管理", "EN": "Categories"},
-    "welcome": {"CN": "欢迎回来！", "EN": "Welcome Back!"},
-    "empty": {"CN": "暂无数据，快去记一笔吧！", "EN": "No records yet. Add one now!"},
-    "cal_view": {"CN": "视图模式", "EN": "View Mode"},
-    "view_month": {"CN": "月视图", "EN": "Month"},
-    "view_week": {"CN": "周视图", "EN": "Week"},
-    "cal_date": {"CN": "选择日期", "EN": "Select Date"},
-    "tab_del":{"CN":"删除记录","EN":"Delete Record"},
-
-    "report_type": {"CN": "报告类型", "EN": "Report Type"},
-    "rep_weekly": {"CN": "周报 (Weekly)", "EN": "Weekly"},
-    "rep_monthly": {"CN": "月报 (Monthly)", "EN": "Monthly"},
-    "rep_yearly": {"CN": "年报 (Yearly)", "EN": "Yearly"},
-    "sel_week": {"CN": "选择周 (点击该周任意一天)", "EN": "Select Week (Pick any day)"},
-    "sel_month": {"CN": "选择月份 (点击该月任意一天)", "EN": "Select Month"},
-    "sel_year": {"CN": "选择年份", "EN": "Select Year"},
-    "gen_report": {"CN": "生成报告", "EN": "Generate Report"},
-    "summary": {"CN": "汇总摘要", "EN": "Summary"},
-    "cat_breakdown": {"CN": "分类详情", "EN": "Category Breakdown"},
-    "download_excel": {"CN": "📥 导出 Excel 报告", "EN": "📥 Download Excel Report"}
-}
-
-CAT_TRANS = {
-    "餐饮": "🍔 Food", "交通": "🚗 Transport", "购物": "🛍️ Shopping",
-    "居住": "🏠 Housing", "工资": "💰 Salary", "娱乐": "🎮 Fun",
-    "医疗": "💊 Medical", "其他": "📦 Others"
-}
-CAT_TRANS_REV = {v: k for k, v in CAT_TRANS.items()}
-
-
-def T(key):
-    lang = st.session_state.get('language_code', 'EN')
-    return TRANS.get(key, {}).get(lang, key)
-
-
-def get_cat_display(cat_name):
-    lang = st.session_state.get('language_code', 'CN')
-    if lang == 'EN': return CAT_TRANS.get(cat_name, cat_name)
-    return cat_name
-
-
-COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Expense": "#EF553B"}
-
-
-# === 4. 回调函数 ===
+# === 3. 回调函数 ===
 def save_callback():
-    lang = st.session_state.get('language_code', 'CN')
+    lang_code = st.session_state.get('language_code', 'CN')
     amt = st.session_state.get('input_amount', 0.0)
-    cat = st.session_state.get(f'input_category_{lang}', "")
+    cat = st.session_state.get(f'input_category_{lang_code}', "")
     typ = st.session_state.get('input_type', "")
     note = st.session_state.get('input_note', "")
     dt = st.session_state.get('input_date', date.today())
@@ -145,7 +74,7 @@ def save_callback():
     if active_id and amt > 0 and cat:
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
         backend.save_record(active_id, dt, db_type, cat, amt, note)
-        st.toast("✅ " + ("已保存!" if lang == 'CN' else "Saved Successfully!"))
+        st.toast("✅ " + ("已保存!" if lang_code == 'CN' else "Saved Successfully!"))
     elif amt <= 0:
         st.error("Amount must be > 0")
 
@@ -166,7 +95,7 @@ def del_cat_callback():
         st.toast(f"Tag removed: {del_c}")
 
 
-# === 5. 日历函数 ===
+# === 4. 日历函数 ===
 def render_calendar_html(year, month, df_data, mode='Month', selected_date=None):
     daily_net = {}
     if not df_data.empty:
@@ -225,7 +154,7 @@ def render_calendar_html(year, month, df_data, mode='Month', selected_date=None)
     return html
 
 
-# === 6. 程序入口 ===
+# === 5. 程序入口 ===
 backend.init_db()
 all_ledgers = backend.get_ledgers()
 ledger_names = [L[1] for L in all_ledgers]
@@ -233,11 +162,11 @@ ledger_map = {L[1]: L[0] for L in all_ledgers}
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2920/2920349.png", width=50)
-    st.markdown("### " + T("sidebar_title"))
+    st.markdown("### " + lang.T("sidebar_title"))  # 使用 lang.T
     st.radio("Language", ["CN", "EN"], horizontal=True, label_visibility="collapsed", key="language_code")
 
     if ledger_names:
-        selected_ledger_name = st.selectbox(T("current_ledger"), ledger_names)
+        selected_ledger_name = st.selectbox(lang.T("current_ledger"), ledger_names)
         current_ledger_id = ledger_map[selected_ledger_name]
         st.session_state['active_ledger_id'] = current_ledger_id
     else:
@@ -246,8 +175,8 @@ with st.sidebar:
         selected_ledger_name = None
 
     st.divider()
-    with st.expander(T("settings")):
-        new_ledger_name = st.text_input(T("create_ledger"), key="new_ledger_input", placeholder="Name...")
+    with st.expander(lang.T("settings")):
+        new_ledger_name = st.text_input(lang.T("create_ledger"), key="new_ledger_input", placeholder="Name...")
         if st.button("➕", use_container_width=True):
             if new_ledger_name and new_ledger_name not in ledger_names:
                 backend.add_ledger(new_ledger_name)
@@ -259,7 +188,7 @@ with st.sidebar:
                 st.rerun()
 
     if selected_ledger_name:
-        with st.expander(T("manage_cats")):
+        with st.expander(lang.T("manage_cats")):
             current_categories = backend.get_categories(current_ledger_id)
             c1, c2 = st.tabs(["➕", "➖"])
             with c1:
@@ -272,23 +201,24 @@ with st.sidebar:
 if selected_ledger_name:
     st.title(f"{selected_ledger_name}")
 else:
-    st.title(T("app_title"))
+    st.title(lang.T("app_title"))
     st.stop()
 
 # 记账区
-with st.expander(T("header_entry"), expanded=True):
+with st.expander(lang.T("header_entry"), expanded=True):
     c1, c2, c3, c4 = st.columns([1.2, 1, 1.2, 1])
-    with c1: st.date_input(T("date"), date.today(), key='input_date')
+    with c1: st.date_input(lang.T("date"), date.today(), key='input_date')
     with c2:
         type_opts = ["支出", "收入"] if st.session_state.get('language_code') == 'CN' else ["Expense", "Income"]
-        st.selectbox(T("category"), type_opts, key='input_type', label_visibility="visible")
+        st.selectbox(lang.T("category"), type_opts, key='input_type', label_visibility="visible")
     with c3:
         current_cats = backend.get_categories(current_ledger_id)
-        st.selectbox(T("category"), current_cats, format_func=get_cat_display,
+        # 使用 lang.get_cat_display
+        st.selectbox(lang.T("category"), current_cats, format_func=lang.get_cat_display,
                      key=f'input_category_{st.session_state.get("language_code")}')
-    with c4: st.number_input(T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
-    st.text_input(T("note"), key='input_note', placeholder="Note...")
-    st.button(T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
+    with c4: st.number_input(lang.T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
+    st.text_input(lang.T("note"), key='input_note', placeholder="Note...")
+    st.button(lang.T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
 # =========================================================
 # 🔥 全局数据翻译层
@@ -299,24 +229,22 @@ if not raw_df.empty:
     current_lang = st.session_state.get('language_code', 'CN')
 
     if current_lang == 'EN':
-        # 强制将 Type 转为英文
         raw_df['type'] = raw_df['type'].replace(['支出', 'Expense'], 'Expense')
         raw_df['type'] = raw_df['type'].replace(['收入', 'Income'], 'Income')
-        # 翻译分类
-        raw_df['category'] = raw_df['category'].map(CAT_TRANS).fillna(raw_df['category'])
-    else:  # CN
-        # 强制将 Type 转为中文
+        # 使用 lang.CAT_TRANS
+        raw_df['category'] = raw_df['category'].map(lang.CAT_TRANS).fillna(raw_df['category'])
+    else:
         raw_df['type'] = raw_df['type'].replace(['Expense', '支出'], '支出')
         raw_df['type'] = raw_df['type'].replace(['Income', '收入'], '收入')
-        # 翻译分类
-        raw_df['category'] = raw_df['category'].map(CAT_TRANS_REV).fillna(raw_df['category'])
+        # 使用 lang.CAT_TRANS_REV
+        raw_df['category'] = raw_df['category'].map(lang.CAT_TRANS_REV).fillna(raw_df['category'])
 
 # 选项卡
 tab_overview, tab_stats, tab_data, tab_report = st.tabs(
-    [T("tab_overview"), T("tab_stats"), T("tab_data"), T("tab_report")])
+    [lang.T("tab_overview"), lang.T("tab_stats"), lang.T("tab_data"), lang.T("tab_report")])
 
 if raw_df.empty:
-    st.info(T("empty"))
+    st.info(lang.T("empty"))
     st.stop()
 
 # === Tab 1: 概览 ===
@@ -329,9 +257,9 @@ with tab_overview:
     bal = inc - exp
 
     col1, col2, col3 = st.columns(3)
-    col1.metric(T("total_income"), f"{CURRENCY} {inc:,.2f}", delta="Income", delta_color="normal")
-    col2.metric(T("total_expense"), f"{CURRENCY} {exp:,.2f}", delta=f"-{exp:,.2f}", delta_color="normal")
-    col3.metric(T("balance"), f"{CURRENCY} {bal:,.2f}", delta=f"{bal:,.2f}", delta_color="normal")
+    col1.metric(lang.T("total_income"), f"{CURRENCY} {inc:,.2f}", delta="Income", delta_color="normal")
+    col2.metric(lang.T("total_expense"), f"{CURRENCY} {exp:,.2f}", delta=f"-{exp:,.2f}", delta_color="normal")
+    col3.metric(lang.T("balance"), f"{CURRENCY} {bal:,.2f}", delta=f"{bal:,.2f}", delta_color="normal")
 
     st.divider()
     c_chart1, c_chart2 = st.columns(2)
@@ -350,9 +278,9 @@ with tab_overview:
 with tab_stats:
     cc1, cc2 = st.columns([1, 2])
     with cc1:
-        v_mode_sel = st.radio(T("cal_view"), [T("view_month"), T("view_week")], horizontal=True)
-        mode_code = 'Month' if v_mode_sel == T("view_month") else 'Week'
-    with cc2: pick_date = st.date_input(T("cal_date"), date.today())
+        v_mode_sel = st.radio(lang.T("cal_view"), [lang.T("view_month"), lang.T("view_week")], horizontal=True)
+        mode_code = 'Month' if v_mode_sel == lang.T("view_month") else 'Week'
+    with cc2: pick_date = st.date_input(lang.T("cal_date"), date.today())
 
     st.divider()
     cal_html = render_calendar_html(pick_date.year, pick_date.month, raw_df, mode=mode_code, selected_date=pick_date)
@@ -365,19 +293,20 @@ with tab_stats:
     fig_bar = px.bar(monthly_stats, x='month', y='amount', color='type', barmode='group', color_discrete_map=COLOR_MAP)
     st.plotly_chart(fig_bar, use_container_width=True)
 
-# === Tab 3: 明细 (修复 Type Title & 隐藏 ID) ===
+# === Tab 3: 明细 ===
 with tab_data:
-    with st.expander(T("filter_label"), expanded=False):
+    with st.expander(lang.T("filter_label"), expanded=False):
         f1, f2 = st.columns(2)
         available_cats = raw_df['category'].unique().tolist()
-        sel_cats = f1.multiselect(T("filter_cat"), available_cats)
+        sel_cats = f1.multiselect(lang.T("filter_cat"), available_cats)
 
-        type_opts = [T("all")] + ([T("Expense"), T("Income")] if current_lang == 'EN' else ["支出", "收入"])
-        sel_type = f2.selectbox(T("filter_type"), type_opts)
+        type_opts = [lang.T("all")] + (
+            [lang.T("Expense"), lang.T("Income")] if current_lang == 'EN' else ["支出", "收入"])
+        sel_type = f2.selectbox(lang.T("filter_type"), type_opts)
 
     df_show = raw_df.copy()
     if sel_cats: df_show = df_show[df_show['category'].isin(sel_cats)]
-    if sel_type != T("all"):
+    if sel_type != lang.T("all"):
         target_type = sel_type
         df_show = df_show[df_show['type'] == target_type]
 
@@ -385,33 +314,30 @@ with tab_data:
         df_show,
         use_container_width=True,
         hide_index=True,
-        # 这里指定列顺序，不包含 'id' 或 'ledger_id'，所以表格里不会显示
         column_order=("date", "type", "category", "amount", "note"),
         column_config={
-            # 这里调用 T("date"), T("type") 确保表头标题会变
-            "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
-            "type": st.column_config.TextColumn(T("type"), width="small"),
-            "category": st.column_config.TextColumn(T("category"), width="medium"),
-            "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f", step=0.01),
-            "note": st.column_config.TextColumn(T("note"), width="large"),
+            "date": st.column_config.DateColumn(lang.T("date"), format="YYYY-MM-DD"),
+            "type": st.column_config.TextColumn(lang.T("type"), width="small"),
+            "category": st.column_config.TextColumn(lang.T("category"), width="medium"),
+            "amount": st.column_config.NumberColumn(lang.T("amount"), format=f"{CURRENCY} %.2f", step=0.01),
+            "note": st.column_config.TextColumn(lang.T("note"), width="large"),
         }
     )
 
     c_del1, c_del2 = st.columns([3, 1])
     with c_del1:
-        # 删除逻辑依然使用 id
         del_opts = {f"{r['date']} - {r['category']} - {r['amount']}": r['id'] for i, r in df_show.iterrows()}
         sel_rec_label = st.selectbox("Delete Record", options=list(del_opts.keys()), label_visibility="collapsed")
     with c_del2:
-        if st.button("🗑️ " + T("tab_del"), type="secondary", use_container_width=True):
+        if st.button("🗑️ " + lang.T("tab_del"), type="secondary", use_container_width=True):
             if sel_rec_label:
                 backend.delete_record(del_opts[sel_rec_label])
                 st.rerun()
 
-# === Tab 4: 财务报告 (优化版：隐藏 ID + 格式化) ===
+# === Tab 4: 财务报告 ===
 with tab_report:
-    st.subheader(T("report_type"))
-    report_mode = st.radio("Mode", [T("rep_weekly"), T("rep_monthly"), T("rep_yearly")], horizontal=True,
+    st.subheader(lang.T("report_type"))
+    report_mode = st.radio("Mode", [lang.T("rep_weekly"), lang.T("rep_monthly"), lang.T("rep_yearly")], horizontal=True,
                            label_visibility="collapsed")
 
     start_date, end_date = None, None
@@ -419,25 +345,24 @@ with tab_report:
 
     c_rep1, c_rep2 = st.columns(2)
     with c_rep1:
-        if report_mode == T("rep_weekly"):
-            sel_d = st.date_input(T("sel_week"), date.today())
+        if report_mode == lang.T("rep_weekly"):
+            sel_d = st.date_input(lang.T("sel_week"), date.today())
             start_date = sel_d - timedelta(days=sel_d.weekday())
             end_date = start_date + timedelta(days=6)
             filter_desc = f"Week: {start_date} ~ {end_date}"
-        elif report_mode == T("rep_monthly"):
-            sel_d = st.date_input(T("sel_month"), date.today())
+        elif report_mode == lang.T("rep_monthly"):
+            sel_d = st.date_input(lang.T("sel_month"), date.today())
             start_date = sel_d.replace(day=1)
             next_month = start_date.replace(day=28) + timedelta(days=4)
             end_date = next_month - timedelta(days=next_month.day)
             filter_desc = f"Month: {start_date.strftime('%Y-%m')}"
-        elif report_mode == T("rep_yearly"):
-            sel_year = st.selectbox(T("sel_year"), range(date.today().year, 2020, -1))
+        elif report_mode == lang.T("rep_yearly"):
+            sel_year = st.selectbox(lang.T("sel_year"), range(date.today().year, 2020, -1))
             start_date = date(sel_year, 1, 1)
             end_date = date(sel_year, 12, 31)
             filter_desc = f"Year: {sel_year}"
 
     if start_date and end_date:
-        # 筛选数据
         mask = (pd.to_datetime(raw_df['date']).dt.date >= start_date) & (
                     pd.to_datetime(raw_df['date']).dt.date <= end_date)
         rep_df = raw_df[mask].copy()
@@ -453,14 +378,12 @@ with tab_report:
             r_exp = rep_df[rep_df['type'] == exp_k]['amount'].sum()
             r_bal = r_inc - r_exp
 
-            # 1. 汇总卡片
             rc1, rc2, rc3 = st.columns(3)
-            rc1.metric(T("total_income"), f"{CURRENCY} {r_inc:,.2f}")
-            rc2.metric(T("total_expense"), f"{CURRENCY} {r_exp:,.2f}")
-            rc3.metric(T("balance"), f"{CURRENCY} {r_bal:,.2f}")
+            rc1.metric(lang.T("total_income"), f"{CURRENCY} {r_inc:,.2f}")
+            rc2.metric(lang.T("total_expense"), f"{CURRENCY} {r_exp:,.2f}")
+            rc3.metric(lang.T("balance"), f"{CURRENCY} {r_bal:,.2f}")
 
-            # 2. 分类详情表 (美化版)
-            st.subheader(T("cat_breakdown"))
+            st.subheader(lang.T("cat_breakdown"))
             cat_summary = rep_df.groupby(['category', 'type'])['amount'].sum().reset_index().sort_values('amount',
                                                                                                          ascending=False)
 
@@ -468,38 +391,33 @@ with tab_report:
                 cat_summary,
                 use_container_width=True,
                 hide_index=True,
-                # 显式配置列名翻译
                 column_config={
-                    "category": st.column_config.TextColumn(T("category")),
-                    "type": st.column_config.TextColumn(T("type")),
-                    "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f")
+                    "category": st.column_config.TextColumn(lang.T("category")),
+                    "type": st.column_config.TextColumn(lang.T("type")),
+                    "amount": st.column_config.NumberColumn(lang.T("amount"), format=f"{CURRENCY} %.2f")
                 }
             )
 
-            # 3. 期间明细表 (新增！应用隐藏 ID 逻辑)
-            st.subheader(T("tab_data"))  # 显示 "明细" 标题
+            st.subheader(lang.T("tab_data"))
             st.dataframe(
                 rep_df,
                 use_container_width=True,
                 hide_index=True,
-                # 关键：这里控制显示的列，把 id 排除掉
                 column_order=("date", "type", "category", "amount", "note"),
                 column_config={
-                    "date": st.column_config.DateColumn(T("date"), format="YYYY-MM-DD"),
-                    "type": st.column_config.TextColumn(T("type")),
-                    "category": st.column_config.TextColumn(T("category")),
-                    "amount": st.column_config.NumberColumn(T("amount"), format=f"{CURRENCY} %.2f"),
-                    "note": st.column_config.TextColumn(T("note"))
+                    "date": st.column_config.DateColumn(lang.T("date"), format="YYYY-MM-DD"),
+                    "type": st.column_config.TextColumn(lang.T("type")),
+                    "category": st.column_config.TextColumn(lang.T("category")),
+                    "amount": st.column_config.NumberColumn(lang.T("amount"), format=f"{CURRENCY} %.2f"),
+                    "note": st.column_config.TextColumn(lang.T("note"))
                 }
             )
 
-
-            # 关键：导出前把 ID 列去掉，只保留用户关心的列
             clean_export_df = rep_df[['date', 'type', 'category', 'amount', 'note']]
             excel_data = backend.to_excel(clean_export_df)
 
             st.download_button(
-                label=f"{T('download_excel')}",
+                label=f"📥 {lang.T('download_excel')}",
                 data=excel_data,
                 file_name=f'Report_{start_date}_{end_date}.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
