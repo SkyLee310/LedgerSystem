@@ -156,7 +156,8 @@ TRANS = {
     "cal_view": {"CN": "视图模式", "EN": "View Mode"},
     "view_month": {"CN": "月视图", "EN": "Month"},
     "view_week": {"CN": "周视图", "EN": "Week"},
-    "cal_date": {"CN": "选择日期", "EN": "Select Date"}
+    "cal_date": {"CN": "选择日期", "EN": "Select Date"},
+    "tab_del":{"CN":"删除记录","EN":"Delete Record"}
 }
 
 CAT_TRANS = {
