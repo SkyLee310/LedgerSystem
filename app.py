@@ -462,7 +462,7 @@ with tab_report:
             st.download_button(
                 label=f"{lang.T('download_excel')}",
                 data=excel_data,
-                file_name=f'Professional_Report_{start_date}_{end_date}.xlsx',
+                file_name=f'Financial_Report_{start_date}_{end_date}.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 type='primary'
             )
