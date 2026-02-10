@@ -8,7 +8,7 @@ from datetime import date, timedelta
 
 # === 1. 页面配置 ===
 st.set_page_config(
-    page_title="My Ledger Pro",
+    page_title="Sky Ledger",
     page_icon="💳",
     layout="wide",
     initial_sidebar_state="auto"
