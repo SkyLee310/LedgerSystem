@@ -17,38 +17,85 @@ st.set_page_config(
 CURRENCY = "RM"
 COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Expense": "#EF553B"}
 
-# === 2. 核心 UI 样式 ===
+# === 2. 核心 UI 样式 (已修复：自动适配黑白模式 + 手机端日历优化) ===
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;}
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 
+    /* 修复1：卡片背景颜色改为“自动适配”变量 */
     div[data-testid="stMetric"] {
-        background-color: #262730; 
-        border: 1px solid #464b5c; 
+        background-color: var(--secondary-background-color); /* 自动变白或变黑 */
+        border: 1px solid var(--text-color-20); /* 边框颜色也自动变淡 */
         padding: 15px 20px;
         border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05); /* 阴影改淡一点 */
     }
 
-    /* 日历样式 */
-    .calendar-container { width: 100%; overflow-x: auto; }
-    .cal-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-    .cal-th { text-align: center; padding: 10px 0; font-size: 0.85rem; color: #a0a0a0; width: 14.28%; }
-    .cal-td { padding: 4px; vertical-align: top; border: none !important; background: transparent !important; }
-    .cal-card {
-        background-color: #2d2d3a; border-radius: 12px; height: 95px; padding: 8px;
-        display: flex; flex-direction: column; justify-content: space-between; align-items: center;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: all 0.2s ease;
+    /* 修复 metric 文字颜色 */
+    div[data-testid="stMetricLabel"] { color: var(--text-color); }
+    div[data-testid="stMetricValue"] { color: var(--text-color); }
+
+    /* 日历容器：允许左右滑动 */
+    .calendar-container { 
+        width: 100%; 
+        overflow-x: auto; /* 关键：手机上允许横向滑动 */
+        padding-bottom: 10px; /* 给滑动条留点位置 */
     }
-    .cal-card:hover { transform: translateY(-2px); background-color: #363645; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-    .cal-card.pos { background-color: #00C897; color: white; }
-    .cal-card.neg { background-color: #FF5C5C; color: white; }
+
+    /* 修复2：日历表格强制最小宽度，防止被挤扁 */
+    .cal-table { 
+        width: 100%; 
+        min-width: 600px; /* 关键：强制表格至少600px宽，手机上就不会挤扁了 */
+        table-layout: fixed; 
+        border-collapse: separate; 
+        border-spacing: 6px; /* 格子之间增加一点间距 */
+    }
+
+    .cal-th { 
+        text-align: center; 
+        padding: 10px 0; 
+        font-size: 0.85rem; 
+        color: var(--text-color-60); /* 自动适配文字颜色 */
+        width: 14.28%; 
+    }
+
+    .cal-td { 
+        padding: 0; 
+        vertical-align: top; 
+        border: none !important; 
+        background: transparent !important; 
+    }
+
+    /* 日历卡片样式优化 */
+    .cal-card {
+        background-color: var(--secondary-background-color); /* 自动适配背景 */
+        border: 1px solid var(--text-color-10); /* 淡淡的边框 */
+        border-radius: 8px; 
+        height: 85px; /* 稍微调矮一点，看起来更精致 */
+        padding: 6px;
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+        transition: all 0.2s ease;
+    }
+
+    .cal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+
+    /* 收入和支出的颜色块 (保持鲜艳) */
+    .cal-card.pos { background-color: rgba(0, 204, 150, 0.15); border: 1px solid #00CC96; color: #00CC96; }
+    .cal-card.neg { background-color: rgba(239, 85, 59, 0.15); border: 1px solid #EF553B; color: #EF553B; }
+
+    /* “今天”的高亮样式 */
     .cal-card.today { border: 2px solid #FFD700; }
-    .cal-day-num { font-size: 1rem; font-weight: 600; align-self: flex-start; }
-    .cal-val { font-size: 0.85rem; font-weight: bold; align-self: flex-end; }
-    .week-view .cal-card { height: 110px; }
+
+    .cal-day-num { font-size: 0.9rem; font-weight: 600; align-self: flex-start; color: var(--text-color); }
+    .cal-val { font-size: 0.8rem; font-weight: bold; align-self: flex-end; }
+
+    .week-view .cal-card { height: 100px; }
     </style>
     """, unsafe_allow_html=True)
 
