@@ -24,15 +24,30 @@ st.markdown("""
     footer {visibility: hidden;}
     .block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
 
-    /* 顶部卡片 Metric */
+    /* === 🔴 修复后的卡片样式 (兼容黑白模式) === */
     div[data-testid="stMetric"] {
-        background-color: var(--secondary-background-color) !important;
-        border: none !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important; 
-        padding: 15px;
+        /* 1. 背景色：使用半透明白色，这样在白底是浅灰，在黑底是深灰，都能看出来 */
+        background-color: rgba(127, 127, 127, 0.08) !important;
+        
+        /* 2. 边框：加上细微的边框，这是暗色模式区分卡片的关键 */
+        border: 1px solid rgba(128, 128, 128, 0.2) !important;
+        
+        /* 3. 圆角与间距 */
         border-radius: 12px;
+        padding: 15px;
+        
+        /* 4. 字体颜色强制继承系统，防止变色 */
+        color: inherit !important;
     }
 
+    /* 修复 Metric 内部文字的颜色，防止被强制变白看不清 */
+    div[data-testid="stMetric"] label {
+        color: rgba(150, 150, 150, 0.9) !important; /* 标题颜色 (如 Total Income) */
+    }
+    
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+        font-weight: bold; /* 金额加粗 */
+    }
     /* --- 日历容器 --- */
     .calendar-container { width: 100%; }
 
