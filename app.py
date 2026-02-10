@@ -53,7 +53,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 
-# === 3. 回调函数 ===
 def save_callback():
     lang_code = st.session_state.get('language_code', 'CN')
     amt = st.session_state.get('input_amount', 0.0)
@@ -66,9 +65,13 @@ def save_callback():
     if active_id and amt > 0 and cat:
         db_type = "Expense" if any(x in typ for x in ["支出", "Expense"]) else "Income"
         backend.save_record(active_id, dt, db_type, cat, amt, note)
-        st.toast("✅ " + ("已保存!" if lang_code == 'CN' else "Saved Successfully!"))
+        st.toast("✅ " + ("已保存!" if lang_code == 'CN' else "Saved!"))
+
+        st.session_state['input_amount'] = 0.0
+        st.session_state['input_note'] = ""
     elif amt <= 0:
-        st.error("Amount must be > 0")
+        # 如果是因为按 Enter 触发但没填金额，不做处理或轻轻提醒
+        pass
 
 
 def add_cat_callback():
@@ -172,7 +175,7 @@ with st.sidebar:
                 backend.add_ledger(new_ledger_name)
                 st.rerun()
         if ledger_names:
-            ledger_to_del = st.selectbox("Del Ledger", ledger_names, key="del_ledger_select")
+            ledger_to_del = st.selectbox(lang.T("del_ledger"), ledger_names, key="del_ledger_select")
             if st.button("🗑️", type="primary", use_container_width=True):
                 backend.delete_ledger(ledger_map[ledger_to_del])
                 st.rerun()
@@ -205,13 +208,14 @@ with st.expander(lang.T("header_entry"), expanded=True):
         current_cats = backend.get_categories(current_ledger_id)
         st.selectbox(lang.T("category"), current_cats, format_func=lang.get_cat_display,
                      key=f'input_category_{st.session_state.get("language_code")}')
-    with c4: st.number_input(lang.T("amount"), min_value=0.0, step=1.0, format="%.2f", key='input_amount')
-    st.text_input(lang.T("note"), key='input_note', placeholder="Note...")
+    with c4:
+        st.number_input(lang.T("amount"), min_value=0.0, step=1.0, format="%.2f",
+                        key='input_amount', on_change=save_callback)
+
+    st.text_input(lang.T("note"), key='input_note', placeholder="Note...", on_change=save_callback)
     st.button(lang.T("btn_save"), on_click=save_callback, type="primary", use_container_width=True)
 
-# =========================================================
-# 🔥 修复：增强版全局数据翻译
-# =========================================================
+
 raw_df = backend.get_all_records(current_ledger_id)
 
 if not raw_df.empty:
@@ -418,14 +422,9 @@ with tab_report:
 
             export_df = rep_df.copy()
 
-
-            # 2. 清洗 Emoji (去除非文字符号)
-            # 逻辑：如果是系统自带的带 Emoji 分类，我们通过 split 提取纯文本部分
-            # 例如 "🍔 Food" -> "Food", "🍔 餐饮" -> "餐饮"
-            # 假设格式总是 "Emoji + 空格 + 文本"，如果不是则保留原样(自定义分类)
+            # 1. 清洗 Emoji (保持不变)
             def clean_emoji(val):
                 if isinstance(val, str) and " " in val:
-                    # 尝试分割，取空格后的部分
                     parts = val.split(" ", 1)
                     if len(parts) > 1:
                         return parts[1]
@@ -434,24 +433,83 @@ with tab_report:
 
             export_df['category'] = export_df['category'].apply(clean_emoji)
 
-            # 3. 收支分列 (Pivot / Split Columns)
-            # 创建 Income 和 Expense 列
-            export_df[lang.T('col_inc')] = export_df.apply(lambda x: x['amount'] if x['type'] == inc_k else 0, axis=1)
-            export_df[lang.T('col_exp')] = export_df.apply(lambda x: x['amount'] if x['type'] == exp_k else 0, axis=1)
+            # 2. 收支分列 (保持单币种 amount, 空值设为 None)
+            export_df[lang.T('col_inc')] = export_df.apply(lambda x: x['amount'] if x['type'] == inc_k else None,
+                                                           axis=1)
+            export_df[lang.T('col_exp')] = export_df.apply(lambda x: x['amount'] if x['type'] == exp_k else None,
+                                                           axis=1)
 
-            # 4. 整理最终列 (日期, 分类, 收入, 支出, 备注)
-            # 注意：不再包含原来的 'type' 和 'amount' 列
+            # 3. 整理列
             final_cols = ['date', 'category', lang.T('col_inc'), lang.T('col_exp'), 'note']
             export_df = export_df[final_cols]
 
-            # 5. 重命名列头为专业术语
-            export_df.columns = [
-                lang.T('col_date'),
-                lang.T('col_cat'),
-                lang.T('col_inc'),
-                lang.T('col_exp'),
-                lang.T('col_note')
-            ]
+            # 4. 重命名列头 (方便后续操作)
+            col_date = lang.T('col_date')
+            col_cat = lang.T('col_cat')
+            col_inc = lang.T('col_inc')
+            col_exp = lang.T('col_exp')
+            col_note = lang.T('col_note')
+
+            export_df.columns = [col_date, col_cat, col_inc, col_exp, col_note]
+
+
+            # 第一步：计算原始总和
+            sum_inc = export_df[col_inc].sum()
+            sum_exp = export_df[col_exp].sum()
+
+            diff = 0
+            balancing_row = pd.DataFrame()
+            final_total = 0
+
+            # 第二步：判断哪边少，就在哪边补
+            if sum_inc > sum_exp:
+                # 收入 > 支出 (盈利)：需要在【支出列】补平
+                diff = sum_inc - sum_exp
+                final_total = sum_inc  # 最终平衡总额以大者为准
+
+                balancing_row = pd.DataFrame([{
+                    col_date: None,
+                    col_cat: "c.c",  # 用户要求的名称
+                    col_inc: None,
+                    col_exp: diff,  # 补在支出
+                    col_note: "Balancing Figure"
+                }])
+
+            elif sum_exp > sum_inc:
+                # 支出 > 收入 (亏损)：需要在【收入列】补平
+                diff = sum_exp - sum_inc
+                final_total = sum_exp  # 最终平衡总额以大者为准
+
+                balancing_row = pd.DataFrame([{
+                    col_date: None,
+                    col_cat: "c.c",
+                    col_inc: diff,  # 补在收入
+                    col_exp: None,
+                    col_note: "Balancing Figure"
+                }])
+
+            else:
+                # 刚好相等
+                final_total = sum_inc
+
+            # 第三步：如果有差额，插入平衡行
+            if diff > 0 and not balancing_row.empty:
+                export_df = pd.concat([export_df, balancing_row], ignore_index=True)
+
+            # 第四步：添加最终的 TOTAL 行 (两边金额现在一定相等)
+            total_row = pd.DataFrame([{
+                col_date: "TOTAL",
+                col_cat: "",
+                col_inc: final_total,
+                col_exp: final_total,
+                col_note: "Balanced"
+            }])
+
+            export_df = pd.concat([export_df, total_row], ignore_index=True)
+
+            # ==========================================
+            # 🔴 结束修改
+            # ==========================================
 
             excel_data = backend.to_excel(export_df)
 
@@ -462,5 +520,3 @@ with tab_report:
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 type='primary'
             )
-        else:
-            st.info("No data in this period.")

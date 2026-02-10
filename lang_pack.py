@@ -55,8 +55,8 @@ TRANS = {
     # Excel 表头
     "col_date": {"CN": "日期", "EN": "Date"},
     "col_cat": {"CN": "分类", "EN": "Category"},
-    "col_inc": {"CN": "收入", "EN": "Income"},
-    "col_exp": {"CN": "支出", "EN": "Expense"},
+    "col_inc": {"CN": "入账", "EN": "Debit"},
+    "col_exp": {"CN": "出账", "EN": "Credit"},
     "col_note": {"CN": "备注", "EN": "Note"}
 }
 
