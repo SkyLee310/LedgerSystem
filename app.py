@@ -17,7 +17,7 @@ st.set_page_config(
 CURRENCY = "RM"
 COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Expense": "#EF553B"}
 
-# === 2. 核心 UI 样式 (智能响应式：电脑大气，手机紧凑) ===
+# === 2. 核心 UI 样式 (强制 7 等分 + 无边框 + 响应式) ===
 st.markdown("""
     <style>
     /* --- 全局基础设置 --- */
@@ -25,87 +25,113 @@ st.markdown("""
     footer {visibility: hidden;}
     .block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
 
-    /* 顶部卡片 Metric (通用) */
+    /* 顶部卡片 Metric */
     div[data-testid="stMetric"] {
         background-color: var(--secondary-background-color) !important;
-        border: 1px solid rgba(128, 128, 128, 0.2);
+        border: none !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important; 
         padding: 15px;
         border-radius: 12px;
-        box-shadow: none !important;
     }
 
-    /* --- 日历组件 (默认：电脑端样式) --- */
+    /* --- 日历容器 --- */
     .calendar-container { width: 100%; }
 
-    .cal-table { 
-        width: 100%; 
-        table-layout: fixed; /* 保持列宽一致 */
-        border-spacing: 6px; /* 电脑端格子间距大一点 */
-        border-collapse: separate;
+    /* 🔴 核心修复 1：强制表格固定布局，不管内容多长，列宽必须一致 */
+    .calendar-container table {
+        width: 100% !important;
+        table-layout: fixed !important; /* ⚠️ 关键：强制列宽固定 */
+        border-collapse: separate !important;
+        border-spacing: 6px !important;
+        border: none !important;
+        background-color: transparent !important;
+        margin-bottom: 0 !important;
     }
 
+    /* 🔴 核心修复 2：给表头强制 14.28% (100/7) 的宽度 */
     .cal-th { 
-        text-align: center; padding: 10px 0; 
-        font-size: 0.9rem; color: var(--text-color); opacity: 0.7; 
+        text-align: center; 
+        padding: 10px 0 !important; 
+        font-size: 0.9rem; 
+        color: var(--text-color); 
+        opacity: 0.6; 
+        font-weight: normal;
+        width: 14.28% !important; /* ⚠️ 关键：强制 7 等分 */
     }
-    .cal-td { padding: 0; vertical-align: top; }
 
-    /* 电脑端的大格子 */
+    /* 去掉单元格边框 */
+    .calendar-container td {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        vertical-align: top;
+    }
+
+    /* --- 日历格子卡片 (电脑端) --- */
     .cal-card {
         background-color: var(--secondary-background-color);
-        border: 1px solid rgba(128, 128, 128, 0.2);
+        border: none !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         border-radius: 8px; 
-        height: 100px; /* 💻 电脑端高度：舒舒服服的 100px */
+        height: 100px;
         padding: 8px;
         display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+        margin: 0;
         transition: transform 0.2s;
+        /* 防止内容过长撑破格子，溢出隐藏 */
+        overflow: hidden; 
     }
-    .cal-card:hover { transform: translateY(-3px); border-color: var(--primary-color); }
 
-    .cal-day-num { font-size: 1rem; font-weight: 600; align-self: flex-start; }
-    .cal-val { font-size: 0.85rem; font-weight: bold; align-self: flex-end; }
+    .cal-card:hover { 
+        transform: translateY(-3px); 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
+        z-index: 10;
+    }
+
+    .cal-day-num { font-size: 1rem; font-weight: 600; align-self: flex-start; opacity: 0.8; }
+
+    /* 🔴 核心修复 3：金额如果太长，自动缩小或截断，不准撑开格子 */
+    .cal-val { 
+        font-size: 0.85rem; 
+        font-weight: bold; 
+        align-self: flex-end; 
+        white-space: nowrap; /* 不换行 */
+        max-width: 100%;     /* 不超过父容器 */
+        overflow: hidden;    /* 超出部分隐藏 */
+        text-overflow: ellipsis; /* 超出显示省略号... */
+    }
 
     /* 颜色状态 */
-    .cal-card.pos { background-color: rgba(0, 204, 150, 0.1); border: 1px solid rgba(0, 204, 150, 0.4); color: #00CC96; }
-    .cal-card.neg { background-color: rgba(239, 85, 59, 0.1); border: 1px solid rgba(239, 85, 59, 0.4); color: #EF553B; }
-    .cal-card.today { border: 2px solid #FFD700 !important; }
-
+    .cal-card.pos { background-color: rgba(0, 204, 150, 0.15); color: #00CC96; }
+    .cal-card.neg { background-color: rgba(239, 85, 59, 0.15); color: #EF553B; }
+    .cal-card.today { box-shadow: inset 0 0 0 2px #FFD700 !important; }
 
     /* ====================================================================
-       📱 手机端强制覆盖 (当屏幕宽度小于 600px 时生效)
+       📱 手机端样式 (屏幕宽度 < 600px)
        ==================================================================== */
     @media only screen and (max-width: 600px) {
-
         .block-container { padding-top: 1rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+        .calendar-container table { border-spacing: 2px !important; }
+        .cal-th { font-size: 0.7rem; padding: 2px 0 !important; }
 
-        /* 强制缩小日历表格 */
-        .cal-table { 
-            border-spacing: 2px !important; /* 手机端间距变小 */
-        }
-
-        .cal-th { font-size: 0.7rem; padding: 2px 0; }
-
-        /* 手机端的小格子 */
         .cal-card {
-            height: 50px !important; /* 📱 手机端高度：强制压扁到 50px */
+            height: 50px !important; 
             padding: 2px !important;
-            border-radius: 4px;
+            border-radius: 6px;
+            box-shadow: none !important;
+            background-color: rgba(128, 128, 128, 0.08); 
         }
 
-        /* 字体极小化 */
+        .cal-card.pos { background-color: rgba(0, 204, 150, 0.2); }
+        .cal-card.neg { background-color: rgba(239, 85, 59, 0.2); }
+
         .cal-day-num { font-size: 0.7rem; align-self: center; line-height: 1.2; }
-        .cal-val { 
-            font-size: 0.6rem; 
-            align-self: center; 
-            margin-top: -2px;
-        }
+        .cal-val { font-size: 0.6rem; align-self: center; margin-top: -2px; }
 
-        /* 手机上禁用悬停动效 (防止误触) */
         .cal-card:hover { transform: none; }
     }
     </style>
     """, unsafe_allow_html=True)
-
 
 def save_callback():
     lang_code = st.session_state.get('language_code', 'CN')
