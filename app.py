@@ -21,7 +21,6 @@ COLOR_MAP = {"收入": "#00CC96", "Income": "#00CC96", "支出": "#EF553B", "Exp
 st.markdown("""
     <style>
     /* --- 全局基础设置 --- */
-    #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;}
     .block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
 
@@ -389,6 +388,12 @@ with tab_stats:
     df_viz['month'] = pd.to_datetime(df_viz['date']).dt.to_period('M').astype(str)
     monthly_stats = df_viz.groupby(['month', 'type'])['amount'].sum().reset_index()
     fig_bar = px.bar(monthly_stats, x='month', y='amount', color='type', barmode='group', color_discrete_map=COLOR_MAP)
+    fig_bar.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",  # 画布背景透明
+        plot_bgcolor="rgba(0,0,0,0)",  # 图表区域背景透明
+        font=dict(color="gray"),  # 字体颜色微调（可选）
+        margin=dict(t=10, l=10, r=10, b=10)  # 减少留白
+    )
     st.plotly_chart(fig_bar, use_container_width=True)
 
 # === Tab 3: 明细 ===
