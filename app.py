@@ -271,6 +271,18 @@ with st.sidebar:
                 st.selectbox("Del", current_categories, key='del_cat_select', label_visibility="collapsed")
                 st.button("Remove", on_click=del_cat_callback, type="primary", use_container_width=True)
 
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: rgba(128,128,128,0.5); font-size: 0.75rem; margin-top: 10px;'>
+            Sky Ledger <br>
+            <span style='font-size: 0.7rem;'>Version BETA 1.0</span> <br>
+            <span style='font-size: 0.6rem;'>© 2026 Designed by Sky Lee</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 if selected_ledger_name:
     st.title(f"{selected_ledger_name}")
 else:
