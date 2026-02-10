@@ -48,6 +48,7 @@ st.markdown("""
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
         font-weight: bold; /* 金额加粗 */
     }
+    
     /* --- 日历容器 --- */
     .calendar-container { width: 100%; }
 
@@ -324,8 +325,9 @@ with st.expander(lang.T("header_entry"), expanded=True):
 
 raw_df = backend.get_all_records(current_ledger_id)
 
+current_lang = st.session_state.get('language_code', 'CN')
+
 if not raw_df.empty:
-    current_lang = st.session_state.get('language_code', 'CN')
 
     # 0. 清洗数据
     raw_df['category'] = raw_df['category'].astype(str).str.strip()
